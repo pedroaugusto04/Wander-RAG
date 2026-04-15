@@ -205,3 +205,21 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- Project-specific safety rules ---
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Local data (documents and generated assets)
+data/documents/
+
+# IDE/editor local files
+.vscode/
+.idea/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
