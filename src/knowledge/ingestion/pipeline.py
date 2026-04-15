@@ -108,10 +108,19 @@ class IngestionPipeline:
             texts = [c.content for c in batch]
 
             target_dimensions = getattr(self.vector_store, "vector_size", None)
-            embeddings = await self.llm_provider.generate_embeddings(
-                texts,
-                dimensions=target_dimensions,
-            )
+            try:
+                embeddings = await self.llm_provider.generate_embeddings(
+                    texts,
+                    dimensions=target_dimensions,
+                )
+            except Exception:
+                logger.exception(
+                    "Embedding batch failed for '%s' (chunks %d-%d). Skipping this batch and continuing.",
+                    doc_title,
+                    batch_start,
+                    batch_start + len(batch) - 1,
+                )
+                continue
 
             if len(embeddings) != len(batch):
                 logger.warning(
