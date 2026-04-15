@@ -1,0 +1,124 @@
+name: Deploy Application
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'scripts/deploy/**'
+      - '.github/workflows/deploy.yml'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+
+concurrency:
+  group: deploy-app-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: wander-rag
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/wander-rag:latest
+  DOCKER_PLATFORMS: ${{ vars.DOCKER_PLATFORMS || 'linux/amd64' }}
+
+jobs:
+  deploy:
+    name: Build Docker & Deploy to VPS
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: ${{ env.DOCKER_PLATFORMS }}
+          tags: ${{ env.DOCKER_IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Ensure rsync is available on GitHub runner
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Generate production env file
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          QDRANT_HOST: ${{ vars.QDRANT_HOST || '127.0.0.1' }}
+          QDRANT_PORT: ${{ vars.QDRANT_PORT || '6333' }}
+        run: |
+          bash scripts/deploy/generate-env.sh .deploy/.env.prod
+
+      - name: Prepare SSH for VPS sync
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          APP_NAME: ${{ env.APP_NAME }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p 22 -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" \
+            "command -v rsync >/dev/null 2>&1 || { echo 'rsync nao encontrado no servidor remoto'; exit 1; }; mkdir -p ~/$APP_NAME/data/documents"
+
+      - name: Sync deploy assets to VPS
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          APP_NAME: ${{ env.APP_NAME }}
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes" \
+            .deploy/.env.prod "$SERVER_USER@$SERVER_HOST:~/$APP_NAME/.env.prod"
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes" \
+            docker-compose.prod.yml "$SERVER_USER@$SERVER_HOST:~/$APP_NAME/docker-compose.prod.yml"
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.2.4
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
+          APP_NAME: ${{ env.APP_NAME }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,DOCKER_IMAGE,APP_NAME
+          script: |
+            set -euo pipefail
+            mkdir -p ~/${APP_NAME}
+            cd ~/${APP_NAME} || exit 1
+            
+            # Use strict permissions for .env.prod
+            chmod 600 .env.prod
+            
+            echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            sudo docker pull "$DOCKER_IMAGE"
+            
+            sudo env DOCKER_IMAGE="$DOCKER_IMAGE" docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --remove-orphans
+            
+            # Clean up old images
+            sudo docker image prune -f

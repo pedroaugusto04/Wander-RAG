@@ -1,0 +1,48 @@
+#!/bin/bash
+set -euo pipefail
+
+ENV_FILE="${1:-.deploy/.env.prod}"
+mkdir -p "$(dirname "$ENV_FILE")"
+
+cat <<EOF > "$ENV_FILE"
+# ============================================
+# Wander Jr — Production Environment
+# ============================================
+
+# --- Telegram ---
+TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+
+# --- Google Gemini (AI Studio) ---
+GEMINI_API_KEY=${GEMINI_API_KEY}
+
+# --- PostgreSQL ---
+DATABASE_URL=${DATABASE_URL}
+
+# --- Qdrant ---
+QDRANT_HOST=${QDRANT_HOST:-localhost}
+QDRANT_PORT=${QDRANT_PORT:-6333}
+QDRANT_COLLECTION_NAME=${QDRANT_COLLECTION_NAME:-documents}
+
+# --- Application ---
+APP_ENV=production
+APP_LOG_LEVEL=${APP_LOG_LEVEL:-INFO}
+APP_HOST=${APP_HOST:-0.0.0.0}
+APP_PORT=${APP_PORT:-8000}
+
+# --- RAG Settings ---
+RAG_CHUNK_SIZE=${RAG_CHUNK_SIZE:-420}
+RAG_CHUNK_OVERLAP=${RAG_CHUNK_OVERLAP:-24}
+RAG_TOP_K=${RAG_TOP_K:-4}
+RAG_SCORE_THRESHOLD=${RAG_SCORE_THRESHOLD:-0.35}
+RAG_DOCUMENTS_PATH=data/documents
+
+# --- LLM Settings ---
+LLM_MODEL=${LLM_MODEL:-gemini-2.5-flash}
+LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.3}
+LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-700}
+EMBEDDING_MODEL=${EMBEDDING_MODEL:-models/text-embedding-004}
+EMBEDDING_DIMENSIONS=${EMBEDDING_DIMENSIONS:-768}
+EMBEDDING_REQUESTS_PER_MINUTE=${EMBEDDING_REQUESTS_PER_MINUTE:-1500}
+EMBEDDING_MAX_RETRIES=${EMBEDDING_MAX_RETRIES:-8}
+RAG_EMBEDDING_BATCH_SIZE=${RAG_EMBEDDING_BATCH_SIZE:-24}
+EOF
