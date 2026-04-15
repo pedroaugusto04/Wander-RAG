@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Copy dependency files first for layer caching
-COPY pyproject.toml ./
+COPY pyproject.toml README.md ./
 
 # Install dependencies
 RUN uv pip install --system --no-cache -e ".[dev]"
