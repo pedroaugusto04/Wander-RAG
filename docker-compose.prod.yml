@@ -1,4 +1,18 @@
 services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: wander-qdrant-prod
+    restart: always
+    network_mode: host
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+      - ./data/qdrant_snapshots:/qdrant/snapshots
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     image: ${DOCKER_IMAGE}
     container_name: wander-jr-prod
@@ -8,3 +22,6 @@ services:
       - .env.prod
     volumes:
       - ./data/documents:/app/data/documents
+    depends_on:
+      qdrant:
+        condition: service_healthy

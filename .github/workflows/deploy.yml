@@ -83,7 +83,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p 22 -H "$SERVER_HOST" >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy_key -p 22 -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" \
-            "command -v rsync >/dev/null 2>&1 || { echo 'rsync nao encontrado no servidor remoto'; exit 1; }; mkdir -p ~/$APP_NAME/data/documents"
+            "command -v rsync >/dev/null 2>&1 || { echo 'rsync nao encontrado no servidor remoto'; exit 1; }; mkdir -p ~/$APP_NAME/data/documents ~/$APP_NAME/data/qdrant_storage ~/$APP_NAME/data/qdrant_snapshots"
 
       - name: Sync deploy assets to VPS
         env:
