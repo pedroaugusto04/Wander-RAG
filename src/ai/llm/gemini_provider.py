@@ -22,7 +22,7 @@ class GeminiProvider(LLMProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.0-flash",
+        model: str = "gemini-2.5-flash",
         embedding_model: str = "models/gemini-embedding-001",
         embedding_requests_per_minute: int = 60,
         embedding_max_retries: int = 5,

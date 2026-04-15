@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     rag_documents_path: str = Field(default="data/documents")
 
     # --- LLM ---
-    llm_model: str = Field(default="gemini-2.0-flash")
+    llm_model: str = Field(default="gemini-2.5-flash")
     llm_temperature: float = Field(default=0.3)
     llm_max_tokens: int = Field(default=1024)
     embedding_model: str = Field(default="models/gemini-embedding-001")
