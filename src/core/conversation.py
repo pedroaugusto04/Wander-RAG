@@ -65,7 +65,36 @@ class ConversationManager:
     async def handle_message(self, message: IncomingMessage) -> str:
         """Handle an incoming message: manage session → delegate to AI → update history."""
         session = self._get_or_create_session(message)
+        
+        # 1. Interceptar comandos estáticos (Telegram)
+        text_lower = message.text.strip().lower()
+        if text_lower == "/start":
+            return (
+                "Olá! Sou o Wander Jr, assistente virtual do CEFET-MG campus Timóteo.\n\n"
+                "Estou aqui para te ajudar com informações sobre a instituição, calendário acadêmico, "
+                "bolsas, regras e manuais.\n\n"
+                "Como posso ajudar você hoje?"
+            )
+        elif text_lower == "/ajuda":
+            return (
+                "Posso buscar informações nos documentos oficiais do CEFET-MG campus Timóteo.\n\n"
+                "Tente me fazer perguntas como:\n"
+                "- Quais os horários de ônibus?\n"
+                "- Como funciona o edital de monitoria?\n"
+                "- Quando terminam as aulas?\n\n"
+                "*(Lembrando que não tenho acesso a dados pessoais ou notas do SIGAA)*"
+            )
+        elif text_lower == "/sigaa":
+            return "Acesse o sistema acadêmico oficial através do link: https://sig.cefetmg.br/sigaa/"
+        elif text_lower == "/contato":
+            return (
+                "📞 **Contatos - Campus Timóteo**\n\n"
+                "Secretaria de Registro (SRC): (31) 3845-2005 / de.te@cefetmg.br\n"
+                "Diretoria: diretoria-te@cefetmg.br\n"
+                "Para outros setores, acesse o site oficial."
+            )
 
+        # 2. Fluxo Normal com IA
         session.add_turn(MessageRole.USER, message.text)
 
         response = await self.orchestrator.process(message, session)
