@@ -18,11 +18,8 @@ def setup_logging(log_level: str = "INFO") -> None:
     level_styles["error"] = "\x1b[31m"     # Red
     level_styles["exception"] = "\x1b[31m" # Red
     level_styles["critical"] = "\x1b[31;1m" # Bold Red
-
-    # Decide if we are rendering for terminal/dev or JSON
-    # Typically you check if sys.stderr.isatty() or an env var. 
-    # The original author had `if True` here, so we keep that logic but fix the color palette.
-    is_tty = True  # or sys.stderr.isatty() if you prefer later
+    
+    is_tty = True 
     
     structlog.configure(
         processors=[
@@ -31,7 +28,7 @@ def setup_logging(log_level: str = "INFO") -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.dev.set_exc_info,
             structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
-            structlog.dev.ConsoleRenderer(colors=is_tty, level_styles=level_styles) if is_tty else structlog.processors.JSONRenderer(),
+            structlog.dev.ConsoleRenderer(colors=is_tty, force_colors=is_tty, level_styles=level_styles) if is_tty else structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(
             getattr(logging, log_level.upper(), logging.INFO)
