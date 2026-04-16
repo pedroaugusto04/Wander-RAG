@@ -210,7 +210,7 @@ class ConversationManager:
             metadata=message.metadata,
         )
 
-        response = await self.orchestrator.process(message, session)
+        response, assistant_metadata = await self.orchestrator.process_with_metadata(message, session)
 
         session.add_turn(MessageRole.ASSISTANT, response)
         await self._persist_turn(
@@ -218,6 +218,7 @@ class ConversationManager:
             role=MessageRole.ASSISTANT,
             content=response,
             channel_chat_id=message.channel_chat_id,
+            metadata=assistant_metadata,
         )
 
         if len(session.history) > self.max_history * 2:

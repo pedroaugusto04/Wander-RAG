@@ -40,6 +40,15 @@ class AIOrchestrator:
         message: IncomingMessage,
         context: ConversationContext | None = None,
     ) -> str:
+        """Compatibility wrapper returning only response text."""
+        response_text, _metadata = await self.process_with_metadata(message, context)
+        return response_text
+
+    async def process_with_metadata(
+        self,
+        message: IncomingMessage,
+        context: ConversationContext | None = None,
+    ) -> tuple[str, dict[str, Any] | None]:
         """Process a user message through the full AI pipeline.
 
         Flow:
@@ -69,7 +78,7 @@ class AIOrchestrator:
                     start_time,
                     response_text=NO_CONTEXT_RESPONSE,
                 )
-                return NO_CONTEXT_RESPONSE
+                return NO_CONTEXT_RESPONSE, None
 
             llm_response: LLMResponse = await self.llm.generate(
                 messages=rag_result["messages"],
@@ -91,11 +100,16 @@ class AIOrchestrator:
                 response_text=response_text,
             )
 
-            return response_text
+            response_metadata: dict[str, Any] = {
+                "model_used": llm_response.model,
+                "token_usage": llm_response.usage,
+            }
+
+            return response_text, response_metadata
 
         except Exception:
             logger.exception("Error in AI orchestrator")
-            return FALLBACK_ERROR_RESPONSE
+            return FALLBACK_ERROR_RESPONSE, None
 
     def _log_interaction(
         self,
