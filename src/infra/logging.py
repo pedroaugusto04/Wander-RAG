@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import sys
 
@@ -10,6 +11,17 @@ import structlog
 
 def setup_logging(log_level: str = "INFO") -> None:
     """Configure structured logging for the application and intercept stdlib logs."""
+    
+    # Customizar a cor padrão do nome do logger (ex: [src.main]) para melhorar contraste no darkmode
+    _original_get_column_styles = structlog.dev.ConsoleRenderer.get_default_column_styles
+    def custom_column_styles(colors: bool = True, force_colors: bool = False):
+        styles = _original_get_column_styles(colors, force_colors)
+        if colors or force_colors:
+            # Substitui azul escuro por cyan brilhante para melhor legibilidade
+            return dataclasses.replace(styles, logger_name="\x1b[36m")
+        return styles
+    structlog.dev.ConsoleRenderer.get_default_column_styles = staticmethod(custom_column_styles)
+
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
