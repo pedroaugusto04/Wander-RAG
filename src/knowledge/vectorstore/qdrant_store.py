@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 from qdrant_client import AsyncQdrantClient
@@ -13,6 +14,7 @@ from qdrant_client.models import (
     Filter,
     MatchValue,
     PointStruct,
+    SparseVectorParams,
     VectorParams,
 )
 
@@ -28,11 +30,12 @@ class QdrantVectorStore(VectorStore):
         self,
         host: str = "qdrant",
         port: int = 6333,
-        collection_name: str = "documents",
+        collection_name: str = "documents2",
         vector_size: int = 768,
     ) -> None:
         self.collection_name = collection_name
         self.vector_size = vector_size
+        self.dense_vector_name: str | None = None
         self.client = AsyncQdrantClient(host=host, port=port)
 
     async def initialize(self) -> None:
@@ -47,15 +50,17 @@ class QdrantVectorStore(VectorStore):
                     size=self.vector_size,
                     distance=Distance.COSINE,
                 ),
+                sparse_vectors_config={"sparse-vector": SparseVectorParams()},
             )
             logger.info(
-                "Created Qdrant collection '%s' (dim=%d)",
+                "Created Qdrant collection '%s' (dim=%d, sparse='sparse-vector')",
                 self.collection_name,
                 self.vector_size,
             )
         else:
             info = await self.client.get_collection(self.collection_name)
-            existing_size = self._extract_vector_size(info)
+            existing_size, dense_vector_name = self._extract_dense_vector_info(info)
+            self.dense_vector_name = dense_vector_name
             if existing_size is not None and existing_size != self.vector_size:
                 logger.warning(
                     (
@@ -67,25 +72,45 @@ class QdrantVectorStore(VectorStore):
                     self.vector_size,
                 )
                 self.vector_size = existing_size
+
+            sparse_names = self._extract_sparse_vector_names(info)
+            if sparse_names and "sparse-vector" not in sparse_names:
+                logger.warning(
+                    "Qdrant collection '%s' has sparse vectors %s; expected 'sparse-vector'.",
+                    self.collection_name,
+                    sorted(sparse_names),
+                )
+
             logger.info(
-                "Qdrant collection '%s' already exists (dim=%s)",
+                "Qdrant collection '%s' already exists (dim=%s, dense_name=%s, sparse=%s)",
                 self.collection_name,
                 existing_size if existing_size is not None else "unknown",
+                self.dense_vector_name or "<default>",
+                sorted(sparse_names) if sparse_names else "<none>",
             )
 
     @staticmethod
-    def _extract_vector_size(info: Any) -> int | None:
-        """Extract vector size from collection info for unnamed vector configs."""
+    def _extract_dense_vector_info(info: Any) -> tuple[int | None, str | None]:
+        """Extract dense vector size and optional vector name from collection info."""
         vectors_cfg = getattr(info.config.params, "vectors", None)
         if vectors_cfg is None:
-            return None
+            return None, None
         if hasattr(vectors_cfg, "size"):
-            return int(vectors_cfg.size)
-        if isinstance(vectors_cfg, dict):
-            first = next(iter(vectors_cfg.values()), None)
-            if first is not None and hasattr(first, "size"):
-                return int(first.size)
-        return None
+            return int(vectors_cfg.size), None
+        if isinstance(vectors_cfg, Mapping):
+            for name, cfg in vectors_cfg.items():
+                if cfg is not None and hasattr(cfg, "size"):
+                    normalized_name = str(name) if name else None
+                    return int(cfg.size), normalized_name
+        return None, None
+
+    @staticmethod
+    def _extract_sparse_vector_names(info: Any) -> set[str]:
+        """Extract sparse vector names from collection info."""
+        sparse_cfg = getattr(info.config.params, "sparse_vectors", None)
+        if isinstance(sparse_cfg, Mapping):
+            return {str(name) for name in sparse_cfg.keys() if name}
+        return set()
 
     async def upsert(
         self,
@@ -95,10 +120,15 @@ class QdrantVectorStore(VectorStore):
         metadatas: list[dict[str, Any]],
     ) -> None:
         """Insert or update points in the collection."""
+        def vector_payload(embedding: list[float]) -> list[float] | dict[str, list[float]]:
+            if self.dense_vector_name:
+                return {self.dense_vector_name: embedding}
+            return embedding
+
         points = [
             PointStruct(
                 id=str(uuid.uuid5(uuid.NAMESPACE_DNS, doc_id)),
-                vector=embedding,
+                vector=vector_payload(embedding),
                 payload={"content": document, **metadata},
             )
             for doc_id, embedding, document, metadata in zip(
@@ -131,6 +161,7 @@ class QdrantVectorStore(VectorStore):
         results = await self.client.query_points(
             collection_name=self.collection_name,
             query=query_embedding,
+            using=self.dense_vector_name,
             limit=top_k,
             score_threshold=score_threshold,
             query_filter=query_filter,

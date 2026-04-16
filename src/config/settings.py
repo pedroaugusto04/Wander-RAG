@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # --- Qdrant ---
     qdrant_host: str = Field(default="qdrant")
     qdrant_port: int = Field(default=6333)
-    qdrant_collection_name: str = Field(default="documents")
+    qdrant_collection_name: str = Field(default="documents2")
 
     # --- Application ---
     app_env: str = Field(default="development")
