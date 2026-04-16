@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     llm_model: str = Field(default="gemini-2.5-flash")
-    llm_fallback_models: str = Field(default="gemini-3.1-flash-lite,gemma-3-12b")
+    llm_fallback_models: str = Field(default="gemini-2.5-flash-lite,gemini-3-flash")
     llm_temperature: float = Field(default=0.3)
     llm_max_tokens: int = Field(default=1024)
     embedding_model: str = Field(default="models/gemini-embedding-001")
