@@ -9,7 +9,25 @@ import structlog
 
 
 def setup_logging(log_level: str = "INFO") -> None:
-    """Configure structured logging for the application."""
+    """Configure structured logging for the application and intercept stdlib logs."""
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
     level_styles = structlog.dev.ConsoleRenderer.get_default_level_styles(colors=True)
     level_styles["debug"] = "\x1b[34m"     # Blue
     level_styles["info"] = "\x1b[32m"      # Green
@@ -21,19 +39,23 @@ def setup_logging(log_level: str = "INFO") -> None:
     
     is_tty = True 
     
-    structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.StackInfoRenderer(),
-            structlog.dev.set_exc_info,
+    console_formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=[
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.add_logger_name,
             structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
+        ],
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
             structlog.dev.ConsoleRenderer(colors=is_tty, force_colors=is_tty, level_styles=level_styles) if is_tty else structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, log_level.upper(), logging.INFO)
-        ),
-        context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
-        cache_logger_on_first_use=True,
     )
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(console_formatter)
+    
+    root_logger = logging.getLogger()
+    # Remove existing handlers to avoid duplicates
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(log_level.upper())

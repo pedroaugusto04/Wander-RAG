@@ -21,6 +21,8 @@ from src.knowledge.vectorstore.qdrant_store import QdrantVectorStore
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+from src.infra.logging import setup_logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,12 +31,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application startup and shutdown lifecycle."""
     settings = get_settings()
 
-
-    logging.basicConfig(
-        level=getattr(logging, settings.app_log_level.upper()),
-        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    setup_logging(log_level=settings.app_log_level)
 
     logger.info("Starting Wander Jr (env=%s)", settings.app_env)
 
