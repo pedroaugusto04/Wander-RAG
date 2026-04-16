@@ -10,6 +10,7 @@ from src.ai.rag.retriever import RAGRetriever
 
 if TYPE_CHECKING:
     from src.ai.llm.base import LLMProvider
+    from src.ai.rag.reranker import FlashRankReranker
     from src.core.models import RetrievedChunk
     from src.knowledge.vectorstore.base import VectorStore
 
@@ -25,12 +26,16 @@ class RAGPipeline:
         llm_provider: LLMProvider,
         top_k: int = 5,
         score_threshold: float = 0.3,
+        reranker: FlashRankReranker | None = None,
+        retrieval_multiplier: int = 3,
     ) -> None:
         self.retriever = RAGRetriever(
             vector_store=vector_store,
             llm_provider=llm_provider,
             top_k=top_k,
             score_threshold=score_threshold,
+            reranker=reranker,
+            retrieval_multiplier=retrieval_multiplier,
         )
 
     async def process(

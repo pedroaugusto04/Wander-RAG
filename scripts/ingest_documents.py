@@ -16,8 +16,12 @@ async def main() -> None:
 
     from src.ai.llm.gemini_provider import GeminiProvider
     from src.config.settings import get_settings
+    from src.infra.logging import setup_logging
     from src.knowledge.ingestion.pipeline import IngestionPipeline
     from src.knowledge.vectorstore.qdrant_store import QdrantVectorStore
+
+    # Configura o log para aparecer no console durante o script
+    setup_logging(log_level="INFO")
 
     parser = argparse.ArgumentParser(description="Ingest documents into Wander Jr knowledge base")
     parser.add_argument(
@@ -50,6 +54,11 @@ async def main() -> None:
         action="store_true",
         help="Show collection info and exit",
     )
+    parser.add_argument(
+        "--no-llamaparse",
+        action="store_true",
+        help="Force pypdf fallback (skip LlamaParse even if API key is set)",
+    )
 
     args = parser.parse_args()
     settings = get_settings()
@@ -81,12 +90,16 @@ async def main() -> None:
         print(f"   Status: {info['status']}")
         return
 
+    llama_api_key = None if args.no_llamaparse else settings.llama_cloud_api_key
+
     pipeline = IngestionPipeline(
         vector_store=vector_store,
         llm_provider=llm_provider,
         chunk_size=args.chunk_size or settings.rag_chunk_size,
         chunk_overlap=settings.rag_chunk_overlap,
         embedding_batch_size=settings.rag_embedding_batch_size,
+        llama_api_key=llama_api_key,
+        llama_parse_tier=settings.llama_parse_tier,
     )
 
     target = Path(args.path)

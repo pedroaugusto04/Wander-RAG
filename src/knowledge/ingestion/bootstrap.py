@@ -24,6 +24,8 @@ async def auto_ingest_if_empty(
     chunk_size: int,
     chunk_overlap: int,
     embedding_batch_size: int,
+    llama_api_key: str | None = None,
+    llama_parse_tier: str = "cost_effective",
     extensions: list[str] | None = None,
 ) -> int:
     """Ingest documents only when the target collection has no points."""
@@ -57,6 +59,8 @@ async def auto_ingest_if_empty(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         embedding_batch_size=embedding_batch_size,
+        llama_api_key=llama_api_key,
+        llama_parse_tier=llama_parse_tier,
     )
 
     try:

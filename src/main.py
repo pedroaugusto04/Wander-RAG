@@ -67,12 +67,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     await vector_store.initialize()
 
+    # ── Reranker (optional) ──────────────────────────────────────
+    reranker = None
+    if settings.reranker_enabled:
+        from src.ai.rag.reranker import FlashRankReranker
+
+        reranker = FlashRankReranker(
+            model_name=settings.reranker_model,
+            top_k=settings.reranker_top_k,
+        )
 
     rag_pipeline = RAGPipeline(
         vector_store=vector_store,
         llm_provider=llm_provider,
         top_k=settings.rag_top_k,
         score_threshold=settings.rag_score_threshold,
+        reranker=reranker,
+        retrieval_multiplier=settings.reranker_retrieval_multiplier,
     )
 
 

@@ -23,6 +23,9 @@ dependencies = [
     "alembic>=1.14.0",
     # Document processing
     "pypdf>=5.0.0",
+    "llama-cloud>=0.1.0",
+    # Reranker (ONNX, no PyTorch needed)
+    "flashrank>=0.2.0",
     # Configuration
     "pydantic-settings>=2.0.0",
     # Utilities

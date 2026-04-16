@@ -48,6 +48,16 @@ class Settings(BaseSettings):
     rag_score_threshold: float = Field(default=0.3)
     rag_documents_path: str = Field(default="data/documents")
 
+    # --- Document Parsing ---
+    llama_cloud_api_key: str = Field(default="")
+    llama_parse_tier: str = Field(default="cost_effective")
+
+    # --- Reranker ---
+    reranker_enabled: bool = Field(default=True)
+    reranker_model: str = Field(default="ms-marco-MultiBERT-L-12")
+    reranker_top_k: int = Field(default=5)
+    reranker_retrieval_multiplier: int = Field(default=3)
+
     # --- LLM ---
     llm_model: str = Field(default="gemini-2.5-flash")
     llm_fallback_models: str = Field(default="gemini-2.5-flash-lite,gemini-3-flash")

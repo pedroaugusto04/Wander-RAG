@@ -1,4 +1,4 @@
-"""Document ingestion pipeline — loads, chunks, embeds, and stores documents."""
+"""Document ingestion pipeline — loads, cleans, chunks, embeds, and stores documents."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from src.knowledge.ingestion.chunker import TextChunker
-from src.knowledge.ingestion.loaders import load_document
+from src.knowledge.ingestion.chunker import MarkdownChunker
+from src.knowledge.ingestion.loaders import DocumentLoader
+from src.knowledge.ingestion.markdown_cleaner import MarkdownCleaner
 
 if TYPE_CHECKING:
     from src.ai.llm.base import LLMProvider
@@ -28,7 +29,7 @@ class DocumentChunk:
 
 
 class IngestionPipeline:
-    """Orchestrates the full ingestion flow: load → chunk → embed → store."""
+    """Orchestrates the full ingestion flow: load → clean → chunk → embed → store."""
 
     def __init__(
         self,
@@ -37,10 +38,17 @@ class IngestionPipeline:
         chunk_size: int = 512,
         chunk_overlap: int = 64,
         embedding_batch_size: int = 20,
+        llama_api_key: str | None = None,
+        llama_parse_tier: str = "cost_effective",
     ) -> None:
         self.vector_store = vector_store
         self.llm_provider = llm_provider
-        self.chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        self.loader = DocumentLoader(
+            llama_api_key=llama_api_key,
+            llama_parse_tier=llama_parse_tier,
+        )
+        self.cleaner = MarkdownCleaner()
+        self.chunker = MarkdownChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         self.embedding_batch_size = max(1, embedding_batch_size)
 
     async def ingest_file(
@@ -63,37 +71,55 @@ class IngestionPipeline:
 
         logger.info("Ingesting '%s' (type=%s, id=%s)", doc_title, doc_type, doc_id)
 
-        text = load_document(path)
-        if not text.strip():
+        # ── Step 1: Load ─────────────────────────────────────────────
+        raw_text = await self.loader.load(path)
+        if not raw_text.strip():
             logger.warning("Empty document: %s", path)
             return 0
 
-        chunks = self.chunker.chunk(text)
-        logger.info("Created %d chunks from '%s'", len(chunks), doc_title)
+        # ── Step 2: Clean Markdown ────────────────────────────────────
+        cleaned = self.cleaner.clean(raw_text, source_filename=path.name)
+        if not cleaned.strip():
+            logger.warning("Document empty after cleaning: %s", path)
+            return 0
 
-        if not chunks:
+        logger.debug(
+            "Cleaned '%s': %d → %d chars",
+            doc_title,
+            len(raw_text),
+            len(cleaned),
+        )
+
+        # ── Step 3: Chunk ─────────────────────────────────────────────
+        chunk_contexts = self.chunker.chunk(cleaned)
+        logger.info("Created %d chunks from '%s'", len(chunk_contexts), doc_title)
+
+        if not chunk_contexts:
             return 0
 
         doc_chunks = [
             DocumentChunk(
-                id=f"{doc_id}_{i}",
-                content=chunk,
+                id=f"{doc_id}_{ctx.chunk_index}",
+                content=ctx.content,
                 metadata={
                     "document_id": doc_id,
                     "document_title": doc_title,
                     "source_type": doc_type,
-                    "chunk_index": i,
-                    "total_chunks": len(chunks),
+                    "chunk_index": ctx.chunk_index,
+                    "total_chunks": len(chunk_contexts),
+                    "section_breadcrumb": ctx.section_breadcrumb,
+                    "heading_level": ctx.heading_level,
                 },
             )
-            for i, chunk in enumerate(chunks)
-            if chunk.strip()
+            for ctx in chunk_contexts
+            if ctx.content.strip()
         ]
 
         if not doc_chunks:
             logger.warning("No non-empty chunks produced for '%s'", doc_title)
             return 0
 
+        # ── Step 4: Embed & Store ─────────────────────────────────────
         all_ids: list[str] = []
         all_embeddings: list[list[float]] = []
         all_documents: list[str] = []
@@ -111,7 +137,7 @@ class IngestionPipeline:
                 )
             except Exception:
                 logger.exception(
-                    "Embedding batch failed for '%s' (chunks %d-%d). Skipping this batch and continuing.",
+                    "Embedding batch failed for '%s' (chunks %d-%d). Skipping.",
                     doc_title,
                     batch_start,
                     batch_start + len(batch) - 1,
@@ -156,6 +182,14 @@ class IngestionPipeline:
         if not all_ids:
             logger.warning("No chunks with embeddings were generated for '%s'", doc_title)
             return 0
+
+        # Deleta os chunks antigos deste documento para evitar chunks "fantasmas" (órfãos) 
+        # caso o documento atualizado tenha menos chunks que a versão anterior.
+        try:
+            if hasattr(self.vector_store, "delete_by_document_id"):
+                await self.vector_store.delete_by_document_id(doc_id)
+        except Exception:
+            logger.warning("Failed to delete existing chunks for '%s'. May leave orphaned chunks.", doc_id)
 
         await self.vector_store.upsert(
             ids=all_ids,

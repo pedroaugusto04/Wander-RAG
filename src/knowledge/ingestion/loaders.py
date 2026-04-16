@@ -1,4 +1,9 @@
-"""Document loaders — extract text from various file formats."""
+"""Document loaders — extract structured Markdown from various file formats.
+
+Supports two parsing backends:
+  1. LlamaParse (cloud) — high-quality extraction with table/layout awareness.
+  2. pypdf (local)      — basic text extraction, used as fallback.
+"""
 
 from __future__ import annotations
 
@@ -11,23 +16,92 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def load_document(path: Path) -> str:
-    """Load a document and return its text content.
+class DocumentLoader:
+    """Loads documents into clean Markdown using LlamaParse or pypdf fallback."""
 
-    Supports: PDF, TXT, Markdown.
-    """
-    suffix = path.suffix.lower()
+    def __init__(
+        self,
+        llama_api_key: str | None = None,
+        llama_parse_tier: str = "cost_effective",
+    ) -> None:
+        self._llama_api_key = llama_api_key or None
+        self._llama_parse_tier = llama_parse_tier
 
-    if suffix == ".pdf":
-        return _load_pdf(path)
-    elif suffix in (".txt", ".md"):
-        return _load_text(path)
-    else:
+    async def load(self, path: Path) -> str:
+        """Load a document and return its content as Markdown.
+
+        For PDFs:
+          - Tries LlamaParse first (if API key is configured).
+          - Falls back to pypdf for basic text extraction.
+        For .txt/.md: reads the file directly.
+        """
+        suffix = path.suffix.lower()
+
+        if suffix in (".txt", ".md"):
+            return _load_text(path)
+
+        if suffix == ".pdf":
+            if self._llama_api_key:
+                try:
+                    return await self._load_pdf_llamaparse(path)
+                except Exception:
+                    logger.warning(
+                        "LlamaParse failed for '%s'. Falling back to pypdf.",
+                        path.name,
+                        exc_info=True,
+                    )
+            return _load_pdf_pypdf(path)
+
         raise ValueError(f"Unsupported file format: {suffix}")
 
+    async def _load_pdf_llamaparse(self, path: Path) -> str:
+        """Extract structured Markdown from a PDF using LlamaParse."""
+        from llama_cloud import LlamaCloud
 
-def _load_pdf(path: Path) -> str:
-    """Extract text from a PDF file using pypdf."""
+        client = LlamaCloud(api_key=self._llama_api_key)
+
+        logger.info(
+            "Parsing '%s' with LlamaParse (tier=%s)",
+            path.name,
+            self._llama_parse_tier,
+        )
+
+        file_obj = client.files.create(
+            file=open(path, "rb"),  # noqa: SIM115
+            purpose="parse",
+        )
+
+        result = client.parsing.parse(
+            file_id=file_obj.id,
+            tier=self._llama_parse_tier,
+            version="latest",
+            output_options={
+                "markdown": {
+                    "tables": {"output_tables_as_markdown": True},
+                },
+            },
+            expand=["markdown"],
+        )
+
+        pages: list[str] = []
+        if result.markdown and result.markdown.pages:
+            for page in result.markdown.pages:
+                text = getattr(page, "markdown", None) or ""
+                if text.strip():
+                    pages.append(text.strip())
+
+        markdown = "\n\n---\n\n".join(pages)
+        logger.info(
+            "LlamaParse extracted %d pages from '%s' (%d chars)",
+            len(pages),
+            path.name,
+            len(markdown),
+        )
+        return markdown
+
+
+def _load_pdf_pypdf(path: Path) -> str:
+    """Extract text from a PDF file using pypdf (basic fallback)."""
     from pypdf import PdfReader
 
     reader = PdfReader(str(path))
