@@ -28,6 +28,8 @@ from src.config.settings import get_settings
 from src.core.conversation import ConversationManager
 from src.core.models import ChannelType, IncomingMessage
 from src.core.orchestrator import AIOrchestrator
+from src.infra.conversation_store import PostgresConversationStore
+from src.infra.database import create_db_engine
 from src.knowledge.ingestion.pipeline import IngestionPipeline
 from src.knowledge.vectorstore.qdrant_store import QdrantVectorStore
 
@@ -96,8 +98,15 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
         max_tokens=settings.llm_max_tokens,
     )
 
+    db_session_factory = create_db_engine(settings.database_url)
+    conversation_store = PostgresConversationStore(db_session_factory)
+    await conversation_store.initialize()
+
     # Conversation Manager
-    conversation_manager = ConversationManager(orchestrator=orchestrator)
+    conversation_manager = ConversationManager(
+        orchestrator=orchestrator,
+        conversation_store=conversation_store,
+    )
 
     return conversation_manager, vector_store, llm_provider
 

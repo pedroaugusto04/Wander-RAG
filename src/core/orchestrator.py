@@ -61,7 +61,14 @@ class AIOrchestrator:
             max_score: float = rag_result["max_score"]
 
             if confidence == "none":
-                self._log_interaction(message, None, confidence, max_score, start_time)
+                self._log_interaction(
+                    message,
+                    None,
+                    confidence,
+                    max_score,
+                    start_time,
+                    response_text=NO_CONTEXT_RESPONSE,
+                )
                 return NO_CONTEXT_RESPONSE
 
             llm_response: LLMResponse = await self.llm.generate(
@@ -75,7 +82,14 @@ class AIOrchestrator:
             if confidence == "low":
                 response_text = LOW_CONFIDENCE_DISCLAIMER + response_text
 
-            self._log_interaction(message, llm_response, confidence, max_score, start_time)
+            self._log_interaction(
+                message,
+                llm_response,
+                confidence,
+                max_score,
+                start_time,
+                response_text=response_text,
+            )
 
             return response_text
 
@@ -90,6 +104,7 @@ class AIOrchestrator:
         confidence: str,
         max_score: float,
         start_time: float,
+        response_text: str | None = None,
     ) -> None:
         """Log interaction metrics for monitoring."""
         latency_ms = (time.monotonic() - start_time) * 1000
@@ -111,5 +126,9 @@ class AIOrchestrator:
                     "finish_reason": llm_response.finish_reason,
                 }
             )
+
+        if response_text:
+            compact_response = " ".join(response_text.split())
+            metrics["assistant_response"] = compact_response[:280]
 
         logger.info("Interaction: %s", metrics)
