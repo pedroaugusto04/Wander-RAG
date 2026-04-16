@@ -50,9 +50,11 @@ class Settings(BaseSettings):
 
     # --- LLM ---
     llm_model: str = Field(default="gemini-2.5-flash")
+    llm_fallback_models: str = Field(default="gemini-3.1-flash-lite,gemma-3-12b")
     llm_temperature: float = Field(default=0.3)
     llm_max_tokens: int = Field(default=1024)
     embedding_model: str = Field(default="models/gemini-embedding-001")
+    embedding_fallback_models: str = Field(default="models/gemini-embedding-001")
     # 0 means auto-detect from the embedding model at startup.
     embedding_dimensions: int = Field(default=0)
     embedding_requests_per_minute: int = Field(default=60)
@@ -62,6 +64,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def llm_fallback_model_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_fallback_models.split(",") if m.strip()]
+
+    @property
+    def embedding_fallback_model_list(self) -> list[str]:
+        return [m.strip() for m in self.embedding_fallback_models.split(",") if m.strip()]
 
 
 def get_settings() -> Settings:

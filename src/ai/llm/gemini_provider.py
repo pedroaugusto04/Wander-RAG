@@ -7,6 +7,7 @@ import logging
 import random
 import re
 import time
+from collections.abc import Sequence
 
 from google import genai
 from google.genai import types
@@ -23,14 +24,23 @@ class GeminiProvider(LLMProvider):
         self,
         api_key: str,
         model: str = "gemini-2.5-flash",
+        fallback_models: Sequence[str] | None = None,
         embedding_model: str = "models/gemini-embedding-001",
+        embedding_fallback_models: Sequence[str] | None = None,
         embedding_requests_per_minute: int = 60,
         embedding_max_retries: int = 5,
         embedding_base_retry_seconds: float = 2.0,
     ) -> None:
         self.model = model
+        self.fallback_models = self._normalize_model_list(fallback_models)
+        self._generate_models = self._build_model_chain(self.model, self.fallback_models)
 
         self.embedding_model = embedding_model
+        self.embedding_fallback_models = self._normalize_model_list(embedding_fallback_models)
+        self._embedding_models = self._build_model_chain(
+            self.embedding_model,
+            self.embedding_fallback_models,
+        )
         self._cached_embedding_dimension: int | None = None
         self.embedding_max_retries = max(1, embedding_max_retries)
         self.embedding_base_retry_seconds = max(0.1, embedding_base_retry_seconds)
@@ -76,11 +86,37 @@ class GeminiProvider(LLMProvider):
             system_instruction=system_instruction,
         )
 
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=contents,
-            config=config,
-        )
+        response = None
+        active_model = self.model
+        last_exc: Exception | None = None
+
+        for index, candidate_model in enumerate(self._generate_models):
+            active_model = candidate_model
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=candidate_model,
+                    contents=contents,
+                    config=config,
+                )
+            except Exception as exc:
+                last_exc = exc
+                is_last_model = index >= len(self._generate_models) - 1
+                if not self._should_retry_embedding_error(exc) or is_last_model:
+                    raise
+
+                logger.warning(
+                    "Text generation failed on model '%s'. Trying fallback model: %s",
+                    candidate_model,
+                    type(exc).__name__,
+                )
+                continue
+
+            break
+
+        if response is None:
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("No response returned by any configured generation model")
 
         usage: dict[str, int] = {}
         if response.usage_metadata:
@@ -98,14 +134,14 @@ class GeminiProvider(LLMProvider):
 
         logger.debug(
             "Gemini response: model=%s, tokens=%s, finish=%s",
-            self.model,
+            active_model,
             usage.get("total_tokens", "?"),
             finish_reason,
         )
 
         return LLMResponse(
             content=text,
-            model=self.model,
+            model=active_model,
             usage=usage,
             finish_reason=finish_reason,
         )
@@ -132,36 +168,65 @@ class GeminiProvider(LLMProvider):
             for text in texts
         ]
 
-        attempt = 0
-        while True:
-            attempt += 1
-            await self._wait_for_embedding_slot()
-            try:
-                result = await self.client.aio.models.embed_content(
-                    model=self.embedding_model,
-                    contents=contents,
-                    config=config,
-                )
-            except Exception as exc:
-                if not self._should_retry_embedding_error(exc) or attempt >= self.embedding_max_retries:
+        result = None
+        last_exc: Exception | None = None
+
+        for model_index, candidate_model in enumerate(self._embedding_models):
+            attempt = 0
+            while True:
+                attempt += 1
+                await self._wait_for_embedding_slot()
+                try:
+                    result = await self.client.aio.models.embed_content(
+                        model=candidate_model,
+                        contents=contents,
+                        config=config,
+                    )
+                except Exception as exc:
+                    last_exc = exc
+                    can_retry_same_model = (
+                        self._should_retry_embedding_error(exc)
+                        and attempt < self.embedding_max_retries
+                    )
+
+                    if can_retry_same_model:
+                        delay = self._extract_retry_delay_seconds(exc) or (
+                            self.embedding_base_retry_seconds * (2 ** (attempt - 1))
+                        )
+                        # Small jitter avoids synchronized retries.
+                        delay = min(delay, 30.0) + random.uniform(0.0, 0.5)
+
+                        logger.warning(
+                            "Embedding request failed on '%s' (attempt %d/%d). Retrying in %.2fs: %s",
+                            candidate_model,
+                            attempt,
+                            self.embedding_max_retries,
+                            delay,
+                            type(exc).__name__,
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+
+                    has_next_model = model_index < len(self._embedding_models) - 1
+                    if self._should_retry_embedding_error(exc) and has_next_model:
+                        logger.warning(
+                            "Embedding failed on model '%s'. Switching to fallback model: %s",
+                            candidate_model,
+                            type(exc).__name__,
+                        )
+                        break
+
                     raise
+                else:
+                    break
 
-                delay = self._extract_retry_delay_seconds(exc) or (
-                    self.embedding_base_retry_seconds * (2 ** (attempt - 1))
-                )
-                # Small jitter avoids synchronized retries.
-                delay = min(delay, 30.0) + random.uniform(0.0, 0.5)
+            if result is not None:
+                break
 
-                logger.warning(
-                    "Embedding request failed (attempt %d/%d). Retrying in %.2fs: %s",
-                    attempt,
-                    self.embedding_max_retries,
-                    delay,
-                    type(exc).__name__,
-                )
-                await asyncio.sleep(delay)
-                continue
-            break
+        if result is None:
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("No embeddings returned by any configured embedding model")
 
         embeddings = [emb.values for emb in result.embeddings]
         if dimensions is None and embeddings and self._cached_embedding_dimension is None:
@@ -232,3 +297,24 @@ class GeminiProvider(LLMProvider):
 
         self._cached_embedding_dimension = len(probe[0])
         return self._cached_embedding_dimension
+
+    @staticmethod
+    def _normalize_model_list(models: Sequence[str] | None) -> list[str]:
+        """Return a clean model list with empty values removed."""
+        if not models:
+            return []
+        return [m.strip() for m in models if m and m.strip()]
+
+    @staticmethod
+    def _build_model_chain(primary: str, fallbacks: Sequence[str] | None = None) -> list[str]:
+        """Build model chain preserving order and removing duplicates."""
+        chain = [primary, *(fallbacks or [])]
+        deduplicated: list[str] = []
+        seen: set[str] = set()
+        for model in chain:
+            normalized = model.strip()
+            if not normalized or normalized in seen:
+                continue
+            deduplicated.append(normalized)
+            seen.add(normalized)
+        return deduplicated

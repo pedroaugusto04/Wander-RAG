@@ -31,3 +31,16 @@ def test_extract_retry_delay_seconds_from_message() -> None:
     delay = GeminiProvider._extract_retry_delay_seconds(exc)
     assert delay is not None
     assert delay > 6.0
+
+
+def test_normalize_model_list_removes_empty_entries() -> None:
+    result = GeminiProvider._normalize_model_list(["gemini-3.1-flash-lite", "", "  ", "gemma-3-12b"])
+    assert result == ["gemini-3.1-flash-lite", "gemma-3-12b"]
+
+
+def test_build_model_chain_deduplicates_preserving_order() -> None:
+    chain = GeminiProvider._build_model_chain(
+        "gemini-2.5-flash",
+        ["gemini-3.1-flash-lite", "gemini-2.5-flash", "gemma-3-12b"],
+    )
+    assert chain == ["gemini-2.5-flash", "gemini-3.1-flash-lite", "gemma-3-12b"]
