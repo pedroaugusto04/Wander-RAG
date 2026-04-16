@@ -1,6 +1,6 @@
 """Tests for prompt building."""
 
-from src.ai.rag.prompts import SYSTEM_PROMPT, build_rag_prompt
+from src.ai.rag.prompts import CONTEXT_TEMPLATE, SYSTEM_PROMPT, build_rag_prompt
 
 
 class TestBuildRagPrompt:
@@ -52,4 +52,6 @@ class TestBuildRagPrompt:
     def test_system_prompt_content(self) -> None:
         assert "Wander Jr" in SYSTEM_PROMPT
         assert "CEFET-MG" in SYSTEM_PROMPT
-        assert "NUNCA invente" in SYSTEM_PROMPT
+        assert "Nunca invente" in SYSTEM_PROMPT
+        assert "não encontrou a informação no documento/contexto" in SYSTEM_PROMPT
+        assert "não invente números, limites ou exceções" in CONTEXT_TEMPLATE
