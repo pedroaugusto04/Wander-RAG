@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application startup and shutdown lifecycle."""
     settings = get_settings()
 
-    # Configure logging
+
     logging.basicConfig(
         level=getattr(logging, settings.app_log_level.upper()),
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -38,9 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     logger.info("Starting Wander Jr (env=%s)", settings.app_env)
 
-    # --- Initialize components ---
 
-    # LLM Provider
     llm_provider = GeminiProvider(
         api_key=settings.gemini_api_key,
         model=settings.llm_model,
@@ -59,7 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             detected_embedding_dim,
         )
 
-    # Vector Store
+
     vector_store = QdrantVectorStore(
         host=settings.qdrant_host,
         port=settings.qdrant_port,
@@ -68,7 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     await vector_store.initialize()
 
-    # RAG Pipeline
+
     rag_pipeline = RAGPipeline(
         vector_store=vector_store,
         llm_provider=llm_provider,
@@ -76,7 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         score_threshold=settings.rag_score_threshold,
     )
 
-    # AI Orchestrator
+
     orchestrator = AIOrchestrator(
         llm_provider=llm_provider,
         rag_pipeline=rag_pipeline,
@@ -84,20 +82,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_tokens=settings.llm_max_tokens,
     )
 
-    # Conversation Manager
+
     conversation_manager = ConversationManager(orchestrator=orchestrator)
 
-    # Telegram Adapter
+
     telegram_adapter = TelegramChannelAdapter(token=settings.telegram_bot_token)
     await telegram_adapter.setup()
 
-    # Wire webhook
+
     init_telegram_webhook(
         adapter=telegram_adapter,
         message_handler=conversation_manager.handle_message,
     )
 
-    # Store components on app state for access in routes
+
     app.state.settings = settings
     app.state.vector_store = vector_store
     app.state.llm_provider = llm_provider
@@ -107,7 +105,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    # --- Shutdown ---
+
     logger.info("Shutting down Wander Jr...")
     await telegram_adapter.shutdown()
 
@@ -121,7 +119,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Include routers
+
     app.include_router(telegram_router)
 
     @app.get("/health")

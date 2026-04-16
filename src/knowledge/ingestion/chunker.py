@@ -16,7 +16,6 @@ class TextChunker:
 
     def chunk(self, text: str) -> list[str]:
         """Split text into overlapping chunks."""
-        # Normalize whitespace
         text = re.sub(r"\n{3,}", "\n\n", text)
         text = re.sub(r" {2,}", " ", text)
         text = text.strip()
@@ -29,7 +28,6 @@ class TextChunker:
 
         chunks = self._recursive_split(text, self.SEPARATORS)
 
-        # Merge small chunks and apply overlap
         return self._merge_with_overlap(chunks)
 
     def _recursive_split(self, text: str, separators: list[str]) -> list[str]:
@@ -41,7 +39,6 @@ class TextChunker:
         remaining_separators = separators[1:]
 
         if not separator:
-            # Character-level split as last resort
             return [text[i : i + self.chunk_size] for i in range(0, len(text), self.chunk_size)]
 
         parts = text.split(separator)
@@ -56,7 +53,6 @@ class TextChunker:
             else:
                 if current:
                     result.append(current)
-                # If this part alone is too large, split it further
                 if len(part) > self.chunk_size:
                     result.extend(self._recursive_split(part, remaining_separators))
                     current = ""
@@ -80,13 +76,11 @@ class TextChunker:
                 result.append(chunk.strip())
                 continue
 
-            # Add overlap from the end of previous chunk
             prev = chunks[i - 1]
             overlap = prev[-self.chunk_overlap :] if len(prev) > self.chunk_overlap else prev
 
             merged = f"{overlap} {chunk}".strip()
 
-            # Trim if too long
             if len(merged) > self.chunk_size + self.chunk_overlap:
                 merged = merged[: self.chunk_size + self.chunk_overlap]
 

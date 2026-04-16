@@ -42,13 +42,10 @@ async def telegram_webhook(request: Request) -> Response:
         raw_data: dict[str, Any] = await request.json()
         incoming = _adapter.parse_incoming(raw_data)
 
-        # Send typing indicator while processing
         await _adapter.send_typing_indicator(incoming.channel_chat_id)
 
-        # Process message through the AI pipeline
         response_text: str = await _message_handler(incoming)
 
-        # Send response back via the channel adapter
         outgoing = OutgoingMessage(
             text=response_text,
             channel_chat_id=incoming.channel_chat_id,

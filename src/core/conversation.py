@@ -46,7 +46,6 @@ class ConversationManager:
         session = self._sessions.get(key)
 
         if session:
-            # Check if session has timed out
             elapsed = (datetime.now(UTC) - session.last_activity).total_seconds()
             if elapsed > self.session_timeout * 60:
                 logger.info("Session expired for %s, creating new one", key)
@@ -67,16 +66,12 @@ class ConversationManager:
         """Handle an incoming message: manage session → delegate to AI → update history."""
         session = self._get_or_create_session(message)
 
-        # Add user message to history
         session.add_turn(MessageRole.USER, message.text)
 
-        # Process through AI
         response = await self.orchestrator.process(message, session)
 
-        # Add assistant response to history
         session.add_turn(MessageRole.ASSISTANT, response)
 
-        # Trim history if too long
         if len(session.history) > self.max_history * 2:
             session.history = session.history[-(self.max_history * 2) :]
 

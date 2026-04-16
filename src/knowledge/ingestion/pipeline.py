@@ -63,20 +63,17 @@ class IngestionPipeline:
 
         logger.info("Ingesting '%s' (type=%s, id=%s)", doc_title, doc_type, doc_id)
 
-        # 1. Load document text
         text = load_document(path)
         if not text.strip():
             logger.warning("Empty document: %s", path)
             return 0
 
-        # 2. Chunk the text
         chunks = self.chunker.chunk(text)
         logger.info("Created %d chunks from '%s'", len(chunks), doc_title)
 
         if not chunks:
             return 0
 
-        # 3. Build chunk metadata
         doc_chunks = [
             DocumentChunk(
                 id=f"{doc_id}_{i}",
@@ -97,7 +94,6 @@ class IngestionPipeline:
             logger.warning("No non-empty chunks produced for '%s'", doc_title)
             return 0
 
-        # 4. Generate embeddings in batches
         all_ids: list[str] = []
         all_embeddings: list[list[float]] = []
         all_documents: list[str] = []
@@ -161,7 +157,6 @@ class IngestionPipeline:
             logger.warning("No chunks with embeddings were generated for '%s'", doc_title)
             return 0
 
-        # 5. Store in vector DB
         await self.vector_store.upsert(
             ids=all_ids,
             embeddings=all_embeddings,

@@ -44,7 +44,7 @@ NO_CONTEXT_RESPONSE = (
 )
 
 LOW_CONFIDENCE_DISCLAIMER = (
-    "⚠️ *Com base nas informações disponíveis, esta é minha melhor resposta, "
+    "*Com base nas informações disponíveis, esta é minha melhor resposta, "
     "mas recomendo confirmar com o setor responsável:*\n\n"
 )
 
@@ -64,7 +64,6 @@ def build_rag_prompt(
 
     Returns a list of messages in the format expected by LLMProvider.generate().
     """
-    # Format retrieved chunks
     if retrieved_chunks:
         chunks_text = "\n\n---\n\n".join(
             f"**Fonte: {chunk.get('source', 'Documento institucional')}**\n{chunk['content']}"
@@ -73,7 +72,6 @@ def build_rag_prompt(
     else:
         chunks_text = "(Nenhum documento relevante encontrado)"
 
-    # Format conversation history
     history_text = "(Início da conversa)"
     if conversation_history:
         history_lines = []
@@ -82,7 +80,6 @@ def build_rag_prompt(
             history_lines.append(f"{role}: {turn['content']}")
         history_text = "\n".join(history_lines)
 
-    # Build user message with context
     user_content = CONTEXT_TEMPLATE.format(
         retrieved_chunks=chunks_text,
         conversation_history=history_text,

@@ -46,7 +46,6 @@ class RAGRetriever:
         k = top_k or self.top_k
         threshold = score_threshold or self.score_threshold
 
-        # Generate query embedding
         target_dimensions = getattr(self.vector_store, "vector_size", None)
         embeddings = await self.llm_provider.generate_embeddings(
             [query],
@@ -54,7 +53,6 @@ class RAGRetriever:
         )
         query_embedding = embeddings[0]
 
-        # Search vector store
         results = await self.vector_store.search(
             query_embedding=query_embedding,
             top_k=k,

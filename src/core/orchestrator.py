@@ -52,7 +52,6 @@ class AIOrchestrator:
         start_time = time.monotonic()
 
         try:
-            # 1. RAG pipeline
             rag_result = await self.rag.process(
                 query=message.text,
                 conversation_history=context.get_recent_history() if context else None,
@@ -61,25 +60,21 @@ class AIOrchestrator:
             confidence: str = rag_result["confidence"]
             max_score: float = rag_result["max_score"]
 
-            # 2. Handle no-context case
             if confidence == "none":
                 self._log_interaction(message, None, confidence, max_score, start_time)
                 return NO_CONTEXT_RESPONSE
 
-            # 3. Call LLM
             llm_response: LLMResponse = await self.llm.generate(
                 messages=rag_result["messages"],
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
 
-            # 4. Post-process
             response_text = llm_response.content.strip()
 
             if confidence == "low":
                 response_text = LOW_CONFIDENCE_DISCLAIMER + response_text
 
-            # 5. Log metrics
             self._log_interaction(message, llm_response, confidence, max_score, start_time)
 
             return response_text

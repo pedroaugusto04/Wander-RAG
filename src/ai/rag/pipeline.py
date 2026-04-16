@@ -48,10 +48,8 @@ class RAGPipeline:
                 "max_score": float,
             }
         """
-        # Retrieve relevant chunks
         chunks: list[RetrievedChunk] = await self.retriever.retrieve(query)
 
-        # Determine confidence level
         max_score = max((c.score for c in chunks), default=0.0)
         if not chunks or max_score < 0.3:
             confidence = "none"
@@ -60,7 +58,6 @@ class RAGPipeline:
         else:
             confidence = "high"
 
-        # Build prompt
         chunk_dicts = [
             {
                 "content": c.content,
