@@ -1,10 +1,7 @@
 """Application settings loaded from environment variables."""
 
-from urllib.parse import quote_plus
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy.engine.url import make_url
 
 
 class Settings(BaseSettings):
@@ -65,30 +62,6 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
-
-    @property
-    def resolved_database_url(self) -> str:
-        """Return a safe database URL.
-
-        Uses DATABASE_URL when valid; otherwise builds from POSTGRES_* fields,
-        properly URL-encoding the password (e.g. '@' -> '%40').
-        """
-        raw_url = self.database_url.strip()
-
-        try:
-            parsed = make_url(raw_url)
-            host = parsed.host or ""
-            if host and "@" not in host:
-                return raw_url
-        except Exception:
-            # Fallback to component-based URL below.
-            pass
-
-        encoded_password = quote_plus(self.postgres_password)
-        return (
-            f"postgresql+asyncpg://{self.postgres_user}:{encoded_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
 
 
 def get_settings() -> Settings:

@@ -81,7 +81,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         max_tokens=settings.llm_max_tokens,
     )
 
-    db_session_factory = create_db_engine(settings.resolved_database_url)
+    db_session_factory = create_db_engine(settings.database_url)
     conversation_store = PostgresConversationStore(db_session_factory)
     await conversation_store.initialize()
 
