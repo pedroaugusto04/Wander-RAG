@@ -111,6 +111,20 @@ async def test_static_commands_skip_ai_and_persist_both_turns(
     assert store.append_calls[1]["role"] == MessageRole.ASSISTANT
 
 
+async def test_start_command_lists_student_examples_and_useful_commands() -> None:
+    manager = ConversationManager(
+        orchestrator=FakeOrchestrator(),
+        conversation_store=FakeConversationStore(),
+    )
+
+    response = await manager.handle_message(_make_message("/start"))
+
+    assert "Como funciona o trancamento de disciplina?" in response
+    assert "Qual é o e-mail de um professor do curso?" in response
+    assert "/ajuda para ver mais exemplos de perguntas" in response
+    assert "/sigaa para acessar o portal acadêmico" in response
+
+
 async def test_normal_message_restores_history_persists_and_trims_session() -> None:
     restored_history = [
         {"role": "user", "content": "Oi"},

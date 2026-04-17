@@ -135,8 +135,17 @@ class ConversationManager:
         if text_lower == "/start":
             response = (
                 f"Olá! Sou o {self.assistant_name}, assistente virtual do {self.institution_name}.\n\n"
-                "Estou aqui para te ajudar com informações sobre a instituição, calendário acadêmico, "
-                "bolsas, regras e manuais.\n\n"
+                "Posso te ajudar com informações dos documentos oficiais sobre o campus, o curso "
+                "e a vida acadêmica.\n\n"
+                "Você pode me perguntar, por exemplo:\n"
+                "- Como funciona o trancamento de disciplina?\n"
+                "- Quais documentos são necessários para matrícula?\n"
+                "- Qual é o e-mail de um professor do curso?\n"
+                "- Onde encontro informações sobre monitoria ou bolsas?\n\n"
+                "Comandos úteis:\n"
+                "- /ajuda para ver mais exemplos de perguntas\n"
+                "- /sigaa para acessar o portal acadêmico\n"
+                "- /contato para consultar canais do campus\n\n"
                 "Como posso ajudar você hoje?"
             )
             session.add_turn(MessageRole.USER, message.text)

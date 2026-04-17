@@ -256,26 +256,15 @@ def main() -> None:
 
     app.post_init = post_init
 
-    async def handle_message(update: Update, context) -> None:  # noqa: ANN001, ARG001
-        """Handle incoming text messages."""
+    def _build_incoming_message(update: Update) -> IncomingMessage | None:
+        """Normalize a Telegram update into the app incoming message model."""
         if not update.message or not update.message.text:
-            return
-
-        if conversation_manager is None:
-            await update.message.reply_text("⏳ Bot ainda inicializando, tente novamente...")
-            return
+            return None
 
         user = update.effective_user
         chat = update.effective_chat
 
-        logger.info(
-            "📩 Mensagem de %s: %s",
-            user.first_name if user else "?",
-            update.message.text[:80],
-        )
-
-        # Build normalized incoming message
-        incoming = IncomingMessage(
+        return IncomingMessage(
             channel=ChannelType.TELEGRAM,
             channel_user_id=str(user.id) if user else "unknown",
             channel_chat_id=str(chat.id) if chat else "unknown",
@@ -286,6 +275,23 @@ def main() -> None:
             },
         )
 
+    async def _handle_incoming(
+        update: Update,
+        *,
+        parse_mode: str | None = None,
+    ) -> None:
+        """Process a Telegram message through the shared conversation manager."""
+        incoming = _build_incoming_message(update)
+        if incoming is None or not update.message:
+            return
+
+        if conversation_manager is None:
+            await update.message.reply_text("⏳ Bot ainda inicializando, tente novamente...")
+            return
+
+        user = update.effective_user
+        logger.info("📩 Mensagem de %s: %s", user.first_name if user else "?", incoming.text[:80])
+
         # Send typing indicator
         await update.message.chat.send_action("typing")
 
@@ -293,31 +299,22 @@ def main() -> None:
         response = await conversation_manager.handle_message(incoming)
 
         # Send response
-        await update.message.reply_text(response)
+        await update.message.reply_text(response, parse_mode=parse_mode)
 
         logger.info("📤 Resposta enviada (%d chars)", len(response))
 
-    async def handle_start(update: Update, context) -> None:  # noqa: ANN001, ARG001
-        """Handle /start command."""
-        if not update.message:
-            return
-        await update.message.reply_text(
-            f"👋 Olá! Eu sou o **{settings.app_assistant_name}**, o assistente virtual do "
-            f"{settings.app_institution_name}.\n\n"
-            "Posso te ajudar com informações sobre a instituição baseadas nos "
-            "documentos oficiais.\n\n"
-            "💬 É só me perguntar! Por exemplo:\n"
-            "- _Qual o horário da biblioteca?_\n"
-            "- _Como faço para trancar uma disciplina?_\n"
-            "- _Quais os documentos necessários para matrícula?_\n\n"
-            "📌 Minhas respostas são baseadas nos documentos oficiais da instituição.",
-            parse_mode="Markdown",
-        )
+    async def handle_message(update: Update, context) -> None:  # noqa: ANN001, ARG001
+        """Handle incoming text messages."""
+        await _handle_incoming(update)
+
+    async def handle_command(update: Update, context) -> None:  # noqa: ANN001, ARG001
+        """Handle supported bot commands through the shared conversation flow."""
+        await _handle_incoming(update, parse_mode="Markdown")
 
     # Register handlers
     from telegram.ext import CommandHandler
 
-    app.add_handler(CommandHandler("start", handle_start))
+    app.add_handler(CommandHandler(["start", "ajuda", "sigaa", "contato"], handle_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # Run polling
