@@ -39,10 +39,10 @@ DEFAULT_APP_MAX_HISTORY_TURNS = 10
 
 DEFAULT_RAG_CHUNK_SIZE = 420
 DEFAULT_RAG_CHUNK_OVERLAP = 24
-DEFAULT_RAG_TOP_K = 4
+DEFAULT_RAG_TOP_K = 6
 DEFAULT_RAG_SCORE_THRESHOLD = 0.35
-DEFAULT_RAG_CONFIDENCE_NONE_THRESHOLD = 0.35
-DEFAULT_RAG_CONFIDENCE_LOW_THRESHOLD = 0.6
+DEFAULT_RAG_CONFIDENCE_NONE_THRESHOLD = 0.25
+DEFAULT_RAG_CONFIDENCE_LOW_THRESHOLD = 0.5
 DEFAULT_RAG_DOCUMENTS_PATH = "data/documents"
 DEFAULT_RAG_SUPPORTED_EXTENSIONS = ".pdf,.txt,.md"
 DEFAULT_RAG_LIST_QUERY_MIN_TOP_K = 8
@@ -60,10 +60,9 @@ DEFAULT_LLM_FALLBACK_MODELS = "gemini-2.5-flash-lite,gemini-3-flash"
 DEFAULT_LLM_TEMPERATURE = 0.3
 DEFAULT_LLM_MAX_TOKENS = 10000
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2-preview"
-DEFAULT_EMBEDDING_FALLBACK_MODELS = "models/gemini-embedding-001"
 DEFAULT_EMBEDDING_DIMENSIONS = 768
 DEFAULT_EMBEDDING_REQUESTS_PER_MINUTE = 5
-DEFAULT_EMBEDDING_MAX_RETRIES = 8
+DEFAULT_EMBEDDING_MAX_RETRIES = 3
 DEFAULT_EMBEDDING_BASE_RETRY_SECONDS = 2.0
 DEFAULT_RAG_EMBEDDING_BATCH_SIZE = 10
 
@@ -176,7 +175,6 @@ class Settings(BaseSettings):
     llm_temperature: float = Field(default=DEFAULT_LLM_TEMPERATURE)
     llm_max_tokens: int = Field(default=DEFAULT_LLM_MAX_TOKENS, ge=1)
     embedding_model: str = Field(default=DEFAULT_EMBEDDING_MODEL)
-    embedding_fallback_models: str = Field(default=DEFAULT_EMBEDDING_FALLBACK_MODELS)
     embedding_dimensions: int = Field(default=DEFAULT_EMBEDDING_DIMENSIONS, ge=1)
     embedding_requests_per_minute: int = Field(
         default=DEFAULT_EMBEDDING_REQUESTS_PER_MINUTE,
@@ -209,10 +207,6 @@ class Settings(BaseSettings):
     @property
     def llm_fallback_model_list(self) -> list[str]:
         return _parse_csv(self.llm_fallback_models)
-
-    @property
-    def embedding_fallback_model_list(self) -> list[str]:
-        return _parse_csv(self.embedding_fallback_models)
 
     @property
     def rag_supported_extensions_list(self) -> list[str]:

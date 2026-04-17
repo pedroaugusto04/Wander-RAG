@@ -43,7 +43,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         model=settings.llm_model,
         fallback_models=settings.llm_fallback_model_list,
         embedding_model=settings.embedding_model,
-        embedding_fallback_models=settings.embedding_fallback_model_list,
         embedding_requests_per_minute=settings.embedding_requests_per_minute,
         embedding_max_retries=settings.embedding_max_retries,
         embedding_base_retry_seconds=settings.embedding_base_retry_seconds,

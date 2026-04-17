@@ -16,7 +16,6 @@ cp .env.example .env
 # O projeto também aceita `.env.local` para sobrescritas locais não versionadas
 # Opcional: configure fallback automático de modelos
 # LLM_FALLBACK_MODELS=gemini-3.1-flash-lite,gemma-3-12b
-# EMBEDDING_FALLBACK_MODELS=models/gemini-embedding-001
 ```
 
 Algumas observações úteis:
@@ -48,8 +47,8 @@ Se estiver batendo quota de embedding no Gemini, ajuste no `.env`:
 `EMBEDDING_REQUESTS_PER_MINUTE`, `EMBEDDING_MAX_RETRIES`,
 `EMBEDDING_BASE_RETRY_SECONDS`, `RAG_EMBEDDING_BATCH_SIZE`.
 
-Para fallback automático de chat e embedding, ajuste também:
-`LLM_FALLBACK_MODELS` e `EMBEDDING_FALLBACK_MODELS`.
+Para fallback automático de chat, ajuste também:
+`LLM_FALLBACK_MODELS`.
 
 Para ligar/desligar reranker no `.env`:
 `RERANKER_ENABLED=true` (ligado) ou `RERANKER_ENABLED=false` (desligado).

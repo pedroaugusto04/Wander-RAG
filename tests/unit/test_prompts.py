@@ -1,7 +1,14 @@
 """Tests for prompt building."""
 
 from src.ai.rag.pipeline import RAGPipeline
-from src.ai.rag.prompts import CONTEXT_TEMPLATE, SYSTEM_PROMPT, build_rag_prompt
+from src.ai.rag.prompts import (
+    CONTEXT_TEMPLATE,
+    GENERAL_GUIDANCE_DISCLAIMER,
+    SYSTEM_PROMPT,
+    build_general_guidance_prompt,
+    build_query_rewrite_prompt,
+    build_rag_prompt,
+)
 
 
 class TestBuildRagPrompt:
@@ -57,6 +64,32 @@ class TestBuildRagPrompt:
         assert "não encontrou essa informação" in SYSTEM_PROMPT
         assert "sem mencionar \"contexto\"" in CONTEXT_TEMPLATE
         assert "Nunca use termos técnicos como \"contexto\"" in SYSTEM_PROMPT
+
+    def test_general_guidance_prompt_mentions_orientation_only(self) -> None:
+        messages = build_general_guidance_prompt(
+            user_question="Como costuma funcionar trancamento?",
+            conversation_history=[{"role": "user", "content": "Preciso de ajuda"}],
+        )
+
+        assert len(messages) == 2
+        assert "orientação geral" in messages[0]["content"]
+        assert "Não afirme fatos específicos" in messages[1]["content"]
+        assert "Preciso de ajuda" in messages[1]["content"]
+
+    def test_query_rewrite_prompt_requests_single_line_query(self) -> None:
+        messages = build_query_rewrite_prompt(
+            user_question="E o e-mail dele?",
+            conversation_history=[{"role": "user", "content": "Quem é João Paulo de Castro Costa?"}],
+        )
+
+        assert len(messages) == 2
+        assert "consulta independente" in messages[1]["content"]
+        assert "João Paulo de Castro Costa" in messages[1]["content"]
+        assert "uma única linha" in messages[0]["content"]
+
+    def test_general_guidance_disclaimer_text_is_explicit(self) -> None:
+        assert "orientar de forma geral" in GENERAL_GUIDANCE_DISCLAIMER
+        assert "documentos oficiais" in GENERAL_GUIDANCE_DISCLAIMER
 
 
 class TestRagPipelineSourceLabels:

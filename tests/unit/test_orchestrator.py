@@ -7,8 +7,9 @@ from typing import Any
 
 from src.ai.rag.prompts import (
     FALLBACK_ERROR_RESPONSE,
+    GENERAL_GUIDANCE_DISCLAIMER,
     LOW_CONFIDENCE_DISCLAIMER,
-    NO_CONTEXT_RESPONSE,
+    SENSITIVE_DATA_RESPONSE,
 )
 from src.core.models import ChannelType, ConversationContext, IncomingMessage, MessageRole
 from src.core.orchestrator import AIOrchestrator
@@ -56,13 +57,17 @@ class FakeLLMProvider:
 class FakeRAGPipeline:
     def __init__(self, result: dict[str, Any] | None = None, error: Exception | None = None) -> None:
         self.result = result or {
-            "messages": [{"role": "user", "content": "Prompt"}],
+            "retrieved_chunks": [{"content": "Trecho", "source": "Documento"}],
             "chunks": [],
             "confidence": "high",
             "max_score": 0.9,
+            "retrieval_query": "Prompt",
         }
         self.error = error
         self.calls: list[dict[str, Any]] = []
+        self.assistant_name = "Wander Jr"
+        self.institution_name = "CEFET-MG campus Timóteo"
+        self.prompt_history_turns = 6
 
     async def process(
         self,
@@ -96,13 +101,14 @@ def _make_context(*turns: tuple[MessageRole, str]) -> ConversationContext:
     return context
 
 
-async def test_returns_no_context_response_without_calling_llm() -> None:
+async def test_none_confidence_uses_general_guidance_fallback() -> None:
     rag = FakeRAGPipeline(
         {
-            "messages": [],
+            "retrieved_chunks": [],
             "chunks": [],
             "confidence": "none",
             "max_score": 0.1,
+            "retrieval_query": "Onde fica o RU?",
         }
     )
     llm = FakeLLMProvider()
@@ -110,18 +116,26 @@ async def test_returns_no_context_response_without_calling_llm() -> None:
 
     response, metadata = await orchestrator.process_with_metadata(_make_message("Onde fica o RU?"))
 
-    assert response == NO_CONTEXT_RESPONSE
-    assert metadata is None
-    assert llm.calls == []
+    assert response == GENERAL_GUIDANCE_DISCLAIMER + "Resposta final"
+    assert metadata == {
+        "model_used": "fake-model",
+        "token_usage": {"prompt_tokens": 12, "completion_tokens": 8},
+        "response_mode": "general_guidance_only",
+        "retrieval_confidence": "none",
+        "retrieval_query": "Onde fica o RU?",
+        "retrieved_chunks_count": 0,
+    }
+    assert llm.calls
 
 
 async def test_low_confidence_prefixes_disclaimer_and_returns_metadata() -> None:
     rag = FakeRAGPipeline(
         {
-            "messages": [{"role": "user", "content": "Prompt final"}],
+            "retrieved_chunks": [{"content": "Trecho", "source": "Fonte"}],
             "chunks": [{"content": "Trecho"}],
             "confidence": "low",
             "max_score": 0.45,
+            "retrieval_query": "Qual o horário da biblioteca?",
         }
     )
     llm = FakeLLMProvider(response=FakeLLMResponse(content="A biblioteca abre às 8h."))
@@ -135,8 +149,13 @@ async def test_low_confidence_prefixes_disclaimer_and_returns_metadata() -> None
     assert metadata == {
         "model_used": "fake-model",
         "token_usage": {"prompt_tokens": 12, "completion_tokens": 8},
+        "response_mode": "grounded_with_general_guidance",
+        "retrieval_confidence": "low",
+        "retrieval_query": "Qual o horário da biblioteca?",
+        "retrieved_chunks_count": 1,
     }
-    assert llm.calls[0]["messages"] == [{"role": "user", "content": "Prompt final"}]
+    assert llm.calls[0]["messages"][0]["role"] == "system"
+    assert "Use somente as informações acima para fatos" in llm.calls[0]["messages"][1]["content"]
 
 
 async def test_removes_duplicate_current_user_turn_before_rag_lookup() -> None:
@@ -167,4 +186,31 @@ async def test_returns_fallback_response_on_pipeline_failure() -> None:
 
     assert response == FALLBACK_ERROR_RESPONSE
     assert metadata is None
+    assert llm.calls == []
+
+
+async def test_sensitive_queries_return_fixed_refusal_without_calling_llm() -> None:
+    rag = FakeRAGPipeline(
+        {
+            "retrieved_chunks": [],
+            "chunks": [],
+            "confidence": "none",
+            "max_score": 0.0,
+            "retrieval_query": "Quais são minhas notas?",
+        }
+    )
+    llm = FakeLLMProvider()
+    orchestrator = AIOrchestrator(llm_provider=llm, rag_pipeline=rag)
+
+    response, metadata = await orchestrator.process_with_metadata(
+        _make_message("Quais são minhas notas?")
+    )
+
+    assert response == SENSITIVE_DATA_RESPONSE
+    assert metadata == {
+        "response_mode": "sensitive_refusal",
+        "retrieval_confidence": "none",
+        "retrieval_query": "Quais são minhas notas?",
+        "retrieved_chunks_count": 0,
+    }
     assert llm.calls == []

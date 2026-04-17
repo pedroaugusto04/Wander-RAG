@@ -13,7 +13,27 @@ class FakeVectorStore:
 
 
 class FakeLLMProvider:
-    pass
+    def __init__(self) -> None:
+        self.generate_calls: list[dict[str, Any]] = []
+
+    async def generate(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> Any:
+        self.generate_calls.append(
+            {
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+        )
+
+        class Response:
+            content = "consulta reescrita"
+
+        return Response()
 
 
 async def test_pipeline_returns_none_confidence_when_no_chunks(monkeypatch: Any) -> None:
@@ -32,7 +52,8 @@ async def test_pipeline_returns_none_confidence_when_no_chunks(monkeypatch: Any)
     assert result["confidence"] == "none"
     assert result["max_score"] == 0.0
     assert result["chunks"] == []
-    assert "Nenhum documento relevante" in result["messages"][1]["content"]
+    assert result["retrieved_chunks"] == []
+    assert result["retrieval_query"] == "Onde fica a biblioteca?"
 
 
 async def test_pipeline_uses_vector_score_for_low_confidence_and_source_label(
@@ -64,7 +85,10 @@ async def test_pipeline_uses_vector_score_for_low_confidence_and_source_label(
 
     assert result["confidence"] == "low"
     assert result["max_score"] == 0.45
-    assert "Guia da Graduação — Secretaria > Horário de atendimento" in result["messages"][1]["content"]
+    assert result["retrieval_query"] == "Qual o horário da secretaria?"
+    assert result["retrieved_chunks"][0]["source"] == (
+        "Guia da Graduação — Secretaria > Horário de atendimento"
+    )
 
 
 async def test_pipeline_returns_high_confidence_with_title_only_source(monkeypatch: Any) -> None:
@@ -90,4 +114,62 @@ async def test_pipeline_returns_high_confidence_with_title_only_source(monkeypat
 
     assert result["confidence"] == "high"
     assert result["max_score"] == 0.91
-    assert "**Fonte: docentes**" in result["messages"][1]["content"]
+    assert result["retrieved_chunks"][0]["source"] == "docentes"
+
+
+async def test_pipeline_rewrites_query_when_history_is_present(monkeypatch: Any) -> None:
+    llm = FakeLLMProvider()
+    pipeline = RAGPipeline(
+        vector_store=FakeVectorStore(),  # type: ignore[arg-type]
+        llm_provider=llm,  # type: ignore[arg-type]
+    )
+
+    captured_queries: list[str] = []
+
+    async def fake_retrieve(query: str) -> list[RetrievedChunk]:
+        captured_queries.append(query)
+        return []
+
+    monkeypatch.setattr(pipeline.retriever, "retrieve", fake_retrieve)
+
+    result = await pipeline.process(
+        "E o e-mail dele?",
+        conversation_history=[
+            {"role": "user", "content": "Quem é João Paulo de Castro Costa?"},
+            {"role": "assistant", "content": "Ele é docente do DFG-TM."},
+        ],
+    )
+
+    assert llm.generate_calls
+    assert captured_queries == ["consulta reescrita"]
+    assert result["retrieval_query"] == "consulta reescrita"
+
+
+async def test_pipeline_falls_back_to_original_query_when_rewrite_fails(monkeypatch: Any) -> None:
+    llm = FakeLLMProvider()
+    pipeline = RAGPipeline(
+        vector_store=FakeVectorStore(),  # type: ignore[arg-type]
+        llm_provider=llm,  # type: ignore[arg-type]
+    )
+
+    async def fake_generate(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        raise RuntimeError("rewrite error")
+
+    async def fake_retrieve(query: str) -> list[RetrievedChunk]:
+        return [
+            RetrievedChunk(
+                content="Trecho qualquer",
+                score=0.4,
+                metadata={},
+            )
+        ]
+
+    monkeypatch.setattr(llm, "generate", fake_generate)
+    monkeypatch.setattr(pipeline.retriever, "retrieve", fake_retrieve)
+
+    result = await pipeline.process(
+        "E o e-mail dele?",
+        conversation_history=[{"role": "user", "content": "Quem é João Paulo?"}],
+    )
+
+    assert result["retrieval_query"] == "E o e-mail dele?"

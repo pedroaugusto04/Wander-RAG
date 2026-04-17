@@ -36,7 +36,6 @@ class GeminiProvider(LLMProvider):
         model: str = DEFAULT_LLM_MODEL,
         fallback_models: Sequence[str] | None = None,
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
-        embedding_fallback_models: Sequence[str] | None = None,
         embedding_requests_per_minute: int = DEFAULT_EMBEDDING_REQUESTS_PER_MINUTE,
         embedding_max_retries: int = DEFAULT_EMBEDDING_MAX_RETRIES,
         embedding_base_retry_seconds: float = DEFAULT_EMBEDDING_BASE_RETRY_SECONDS,
@@ -46,11 +45,6 @@ class GeminiProvider(LLMProvider):
         self._generate_models = self._build_model_chain(self.model, self.fallback_models)
 
         self.embedding_model = embedding_model
-        self.embedding_fallback_models = self._normalize_model_list(embedding_fallback_models)
-        self._embedding_models = self._build_model_chain(
-            self.embedding_model,
-            self.embedding_fallback_models,
-        )
         self._cached_embedding_dimension: int | None = None
         self.embedding_max_retries = max(1, embedding_max_retries)
         self.embedding_base_retry_seconds = max(0.1, embedding_base_retry_seconds)
@@ -185,70 +179,49 @@ class GeminiProvider(LLMProvider):
         ]
 
         result = None
-        last_exc: Exception | None = None
 
-        for model_index, candidate_model in enumerate(self._embedding_models):
-            attempt = 0
-            while True:
-                attempt += 1
-                await self._wait_for_embedding_slot()
-                try:
-                    result = await self.client.aio.models.embed_content(
-                        model=candidate_model,
-                        contents=contents,
-                        config=config,
-                    )
-                except Exception as exc:
-                    last_exc = exc
-                    can_retry_same_model = (
-                        self._should_retry_embedding_error(exc)
-                        and attempt < self.embedding_max_retries
-                    )
-
-                    if can_retry_same_model:
-                        delay = self._extract_retry_delay_seconds(exc) or (
-                            self.embedding_base_retry_seconds * (2 ** (attempt - 1))
-                        )
-                        # Small jitter avoids synchronized retries.
-                        delay = min(delay, 30.0) + random.uniform(0.0, 0.5)
-
-                        logger.warning(
-                            "Embedding request failed on '%s' (attempt %d/%d). Retrying in %.2fs: %s",
-                            candidate_model,
-                            attempt,
-                            self.embedding_max_retries,
-                            delay,
-                            type(exc).__name__,
-                        )
-                        await asyncio.sleep(delay)
-                        continue
-
-                    has_next_model = model_index < len(self._embedding_models) - 1
-                    if self._should_retry_embedding_error(exc) and has_next_model:
-                        logger.warning(
-                            "Embedding failed on model '%s'. Switching to fallback model: %s",
-                            candidate_model,
-                            type(exc).__name__,
-                        )
-                        break
-
-                    raise RuntimeError(
-                        f"Embedding failed on '{candidate_model}': "
-                        f"{self._format_exception_summary(exc)}"
-                    ) from None
-                else:
-                    break
-
-            if result is not None:
+        for attempt in range(1, self.embedding_max_retries + 1):
+            await self._wait_for_embedding_slot()
+            try:
+                result = await self.client.aio.models.embed_content(
+                    model=self.embedding_model,
+                    contents=contents,
+                    config=config,
+                )
                 break
+            except Exception as exc:
+                can_retry_same_model = (
+                    self._should_retry_embedding_error(exc)
+                    and attempt < self.embedding_max_retries
+                )
+
+                if can_retry_same_model:
+                    delay = self._extract_retry_delay_seconds(exc) or (
+                        self.embedding_base_retry_seconds * (2 ** (attempt - 1))
+                    )
+                    # Small jitter avoids synchronized retries.
+                    delay = min(delay, 30.0) + random.uniform(0.0, 0.5)
+
+                    logger.warning(
+                        "Embedding request failed on '%s' (attempt %d/%d). Retrying in %.2fs: %s",
+                        self.embedding_model,
+                        attempt,
+                        self.embedding_max_retries,
+                        delay,
+                        type(exc).__name__,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                raise RuntimeError(
+                    f"Embedding failed on '{self.embedding_model}': "
+                    f"{self._format_exception_summary(exc)}"
+                ) from None
 
         if result is None:
-            if last_exc is not None:
-                raise RuntimeError(
-                    f"Embedding failed on all configured models: "
-                    f"{self._format_exception_summary(last_exc)}"
-                ) from None
-            raise RuntimeError("No embeddings returned by any configured embedding model")
+            raise RuntimeError(
+                f"No embeddings returned by model '{self.embedding_model}'"
+            )
 
         embeddings = [emb.values for emb in result.embeddings]
         if dimensions is None and embeddings and self._cached_embedding_dimension is None:

@@ -1,11 +1,10 @@
-"""RAG Pipeline — coordinates retrieval and prompt building."""
+"""RAG Pipeline — coordinates retrieval and retrieval-query preparation."""
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
 
-from src.ai.rag.prompts import build_rag_prompt
 from src.ai.rag.retriever import RAGRetriever
 from src.config.settings import (
     DEFAULT_APP_ASSISTANT_NAME,
@@ -72,13 +71,15 @@ class RAGPipeline:
 
         Returns:
             {
-                "messages": [...],           # Prompt messages ready for LLM
                 "chunks": [...],             # Retrieved chunks
+                "retrieved_chunks": [...],   # Prompt-ready chunk dicts
                 "confidence": "high"|"low"|"none",
                 "max_score": float,
+                "retrieval_query": str,
             }
         """
-        chunks: list[RetrievedChunk] = await self.retriever.retrieve(query)
+        retrieval_query = await self._rewrite_query(query, conversation_history)
+        chunks: list[RetrievedChunk] = await self.retriever.retrieve(retrieval_query)
 
         # Prefer dense retrieval score for confidence when available.
         max_score = max(
@@ -103,20 +104,12 @@ class RAGPipeline:
             for c in chunks
         ]
 
-        messages = build_rag_prompt(
-            user_question=query,
-            retrieved_chunks=chunk_dicts,
-            conversation_history=conversation_history,
-            assistant_name=self.assistant_name,
-            institution_name=self.institution_name,
-            max_history_turns=self.prompt_history_turns,
-        )
-
         return {
-            "messages": messages,
             "chunks": chunks,
+            "retrieved_chunks": chunk_dicts,
             "confidence": confidence,
             "max_score": max_score,
+            "retrieval_query": retrieval_query,
         }
 
     @staticmethod
@@ -127,3 +120,33 @@ class RAGPipeline:
         if breadcrumb:
             return f"{title} — {breadcrumb}"
         return str(title)
+
+    async def _rewrite_query(
+        self,
+        query: str,
+        conversation_history: list[dict[str, str]] | None,
+    ) -> str:
+        """Rewrite follow-up questions into standalone retrieval queries."""
+        if not conversation_history:
+            return query
+
+        try:
+            from src.ai.rag.prompts import build_query_rewrite_prompt
+
+            messages = build_query_rewrite_prompt(
+                user_question=query,
+                conversation_history=conversation_history,
+                assistant_name=self.assistant_name,
+                max_history_turns=self.prompt_history_turns,
+            )
+            response = await self.retriever.llm_provider.generate(
+                messages=messages,
+                temperature=0.0,
+                max_tokens=96,
+            )
+        except Exception as exc:
+            logger.warning("Query rewrite failed, using original query: %s", exc)
+            return query
+
+        rewritten = " ".join(response.content.splitlines()).strip().strip("\"'")
+        return rewritten or query

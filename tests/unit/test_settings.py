@@ -26,10 +26,8 @@ def test_csv_settings_are_normalized_to_lists() -> None:
         telegram_bot_token="telegram-token",
         gemini_api_key="gemini-key",
         llm_fallback_models="model-a, model-b ,, model-c",
-        embedding_fallback_models="embed-a, embed-b",
         rag_supported_extensions="pdf, .md ,TXT",
     )
 
     assert settings.llm_fallback_model_list == ["model-a", "model-b", "model-c"]
-    assert settings.embedding_fallback_model_list == ["embed-a", "embed-b"]
     assert settings.rag_supported_extensions_list == [".pdf", ".md", ".txt"]
