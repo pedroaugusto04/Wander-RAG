@@ -43,12 +43,23 @@ Se estiver batendo quota de embedding no Gemini, ajuste no `.env`:
 Para fallback automático de chat e embedding, ajuste também:
 `LLM_FALLBACK_MODELS` e `EMBEDDING_FALLBACK_MODELS`.
 
+Para ligar/desligar reranker no `.env`:
+`RERANKER_ENABLED=true` (ligado) ou `RERANKER_ENABLED=false` (desligado).
+
 ### 4. Configure o webhook do Telegram
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
   -d "url=https://seu-dominio.com/webhook/telegram"
 ```
+
+## Variáveis no GitHub / Deploy
+
+- Nunca suba o arquivo `.env` no repositório.
+- Suba apenas o `.env.example` com placeholders.
+- No ambiente de deploy (Render, Railway, VPS, etc.), configure as variáveis de ambiente diretamente no painel.
+- Se usar GitHub Actions, configure chaves sensíveis em `Settings > Secrets and variables > Actions`.
+- Para controlar reranker em produção, defina `RERANKER_ENABLED=true|false` nesse ambiente.
 
 ## Estrutura do Projeto
 
