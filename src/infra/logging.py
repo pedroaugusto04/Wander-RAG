@@ -11,7 +11,7 @@ import structlog
 
 def setup_logging(log_level: str = "INFO") -> None:
     """Configure structured logging for the application and intercept stdlib logs."""
-    
+
     _original_get_column_styles = structlog.dev.ConsoleRenderer.get_default_column_styles
     def custom_column_styles(colors: bool = True, force_colors: bool = False):
         styles = _original_get_column_styles(colors, force_colors)
@@ -46,9 +46,9 @@ def setup_logging(log_level: str = "INFO") -> None:
     level_styles["error"] = "\x1b[31m"     # Red
     level_styles["exception"] = "\x1b[31m" # Red
     level_styles["critical"] = "\x1b[31;1m" # Bold Red
-    
-    is_tty = True 
-    
+
+    is_tty = True
+
     console_formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=[
             structlog.stdlib.add_log_level,
@@ -63,7 +63,7 @@ def setup_logging(log_level: str = "INFO") -> None:
 
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(console_formatter)
-    
+
     root_logger = logging.getLogger()
     # Remove existing handlers to avoid duplicates
     root_logger.handlers.clear()

@@ -6,6 +6,16 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from src.config.settings import (
+    DEFAULT_APP_ASSISTANT_NAME,
+    DEFAULT_APP_DIRETORIA_EMAIL,
+    DEFAULT_APP_INSTITUTION_NAME,
+    DEFAULT_APP_MAX_HISTORY_TURNS,
+    DEFAULT_APP_SECRETARIA_EMAIL,
+    DEFAULT_APP_SECRETARIA_PHONE,
+    DEFAULT_APP_SESSION_TIMEOUT_MINUTES,
+    DEFAULT_APP_SIGAA_URL,
+)
 from src.core.models import (
     ConversationContext,
     IncomingMessage,
@@ -13,8 +23,8 @@ from src.core.models import (
 )
 
 if TYPE_CHECKING:
-    from src.infra.conversation_store import PostgresConversationStore
     from src.core.orchestrator import AIOrchestrator
+    from src.infra.conversation_store import PostgresConversationStore
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +39,27 @@ class ConversationManager:
     def __init__(
         self,
         orchestrator: AIOrchestrator,
-        session_timeout_minutes: int = 30,
-        max_history_turns: int = 10,
+        session_timeout_minutes: int = DEFAULT_APP_SESSION_TIMEOUT_MINUTES,
+        max_history_turns: int = DEFAULT_APP_MAX_HISTORY_TURNS,
         conversation_store: PostgresConversationStore | None = None,
+        assistant_name: str = DEFAULT_APP_ASSISTANT_NAME,
+        institution_name: str = DEFAULT_APP_INSTITUTION_NAME,
+        sigaa_url: str = DEFAULT_APP_SIGAA_URL,
+        secretaria_phone: str = DEFAULT_APP_SECRETARIA_PHONE,
+        secretaria_email: str = DEFAULT_APP_SECRETARIA_EMAIL,
+        diretoria_email: str = DEFAULT_APP_DIRETORIA_EMAIL,
     ) -> None:
         self.orchestrator = orchestrator
         self.session_timeout = session_timeout_minutes
         self.max_history = max_history_turns
         self.conversation_store = conversation_store
         self._sessions: dict[str, ConversationContext] = {}
+        self.assistant_name = assistant_name
+        self.institution_name = institution_name
+        self.sigaa_url = sigaa_url
+        self.secretaria_phone = secretaria_phone
+        self.secretaria_email = secretaria_email
+        self.diretoria_email = diretoria_email
 
     def _session_key(self, message: IncomingMessage) -> str:
         """Build a unique session key from channel + user."""
@@ -107,12 +129,12 @@ class ConversationManager:
     async def handle_message(self, message: IncomingMessage) -> str:
         """Handle an incoming message: manage session → delegate to AI → update history."""
         session = await self._get_or_create_session(message)
-        
+
         # 1. Interceptar comandos estáticos (Telegram)
         text_lower = message.text.strip().lower()
         if text_lower == "/start":
             response = (
-                "Olá! Sou o Wander Jr, assistente virtual do CEFET-MG campus Timóteo.\n\n"
+                f"Olá! Sou o {self.assistant_name}, assistente virtual do {self.institution_name}.\n\n"
                 "Estou aqui para te ajudar com informações sobre a instituição, calendário acadêmico, "
                 "bolsas, regras e manuais.\n\n"
                 "Como posso ajudar você hoje?"
@@ -135,7 +157,7 @@ class ConversationManager:
             return response
         elif text_lower == "/ajuda":
             response = (
-                "Posso buscar informações nos documentos oficiais do CEFET-MG campus Timóteo.\n\n"
+                f"Posso buscar informações nos documentos oficiais do {self.institution_name}.\n\n"
                 "Tente me fazer perguntas como:\n"
                 "- Quais os horários de ônibus?\n"
                 "- Como funciona o edital de monitoria?\n"
@@ -159,7 +181,10 @@ class ConversationManager:
             )
             return response
         elif text_lower == "/sigaa":
-            response = "Acesse o sistema acadêmico oficial através do link: https://sig.cefetmg.br/sigaa/"
+            response = (
+                "Acesse o sistema acadêmico oficial através do link: "
+                f"{self.sigaa_url}"
+            )
             session.add_turn(MessageRole.USER, message.text)
             session.add_turn(MessageRole.ASSISTANT, response)
             await self._persist_turn(
@@ -178,9 +203,10 @@ class ConversationManager:
             return response
         elif text_lower == "/contato":
             response = (
-                "📞 **Contatos - Campus Timóteo**\n\n"
-                "Secretaria de Registro (SRC): (31) 3845-2005 / de.te@cefetmg.br\n"
-                "Diretoria: diretoria-te@cefetmg.br\n"
+                f"📞 **Contatos - {self.institution_name}**\n\n"
+                "Secretaria de Registro (SRC): "
+                f"{self.secretaria_phone} / {self.secretaria_email}\n"
+                f"Diretoria: {self.diretoria_email}\n"
                 "Para outros setores, acesse o site oficial."
             )
             session.add_turn(MessageRole.USER, message.text)

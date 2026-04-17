@@ -8,6 +8,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from src.config.settings import (
+    DEFAULT_LLAMA_PARSE_TIER,
+    DEFAULT_RAG_CHUNK_OVERLAP,
+    DEFAULT_RAG_CHUNK_SIZE,
+    DEFAULT_RAG_EMBEDDING_BATCH_SIZE,
+    DEFAULT_RAG_SUPPORTED_EXTENSIONS,
+)
 from src.knowledge.ingestion.chunker import MarkdownChunker
 from src.knowledge.ingestion.loaders import DocumentLoader
 from src.knowledge.ingestion.markdown_cleaner import MarkdownCleaner
@@ -35,11 +42,11 @@ class IngestionPipeline:
         self,
         vector_store: VectorStore,
         llm_provider: LLMProvider,
-        chunk_size: int = 512,
-        chunk_overlap: int = 64,
-        embedding_batch_size: int = 20,
+        chunk_size: int = DEFAULT_RAG_CHUNK_SIZE,
+        chunk_overlap: int = DEFAULT_RAG_CHUNK_OVERLAP,
+        embedding_batch_size: int = DEFAULT_RAG_EMBEDDING_BATCH_SIZE,
         llama_api_key: str | None = None,
-        llama_parse_tier: str = "cost_effective",
+        llama_parse_tier: str = DEFAULT_LLAMA_PARSE_TIER,
     ) -> None:
         self.vector_store = vector_store
         self.llm_provider = llm_provider
@@ -183,7 +190,7 @@ class IngestionPipeline:
             logger.warning("No chunks with embeddings were generated for '%s'", doc_title)
             return 0
 
-        # Deleta os chunks antigos deste documento para evitar chunks "fantasmas" (órfãos) 
+        # Deleta os chunks antigos deste documento para evitar chunks "fantasmas" (órfãos)
         # caso o documento atualizado tenha menos chunks que a versão anterior.
         try:
             if hasattr(self.vector_store, "delete_by_document_id"):
@@ -207,7 +214,7 @@ class IngestionPipeline:
 
     async def ingest_directory(self, directory: Path, extensions: list[str] | None = None) -> int:
         """Ingest supported files recursively in a directory. Returns total chunks."""
-        raw_allowed = extensions or [".pdf", ".txt", ".md"]
+        raw_allowed = extensions or DEFAULT_RAG_SUPPORTED_EXTENSIONS.split(",")
         allowed = {
             ext.lower() if ext.startswith(".") else f".{ext.lower()}"
             for ext in raw_allowed

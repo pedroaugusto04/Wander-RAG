@@ -20,16 +20,18 @@ async def main() -> None:
     from src.knowledge.ingestion.pipeline import IngestionPipeline
     from src.knowledge.vectorstore.qdrant_store import QdrantVectorStore
 
+    settings = get_settings()
+
     # Configura o log para aparecer no console durante o script
-    setup_logging(log_level="INFO")
+    setup_logging(log_level=settings.app_log_level)
 
     parser = argparse.ArgumentParser(description="Ingest documents into Wander Jr knowledge base")
     parser.add_argument(
         "path",
         nargs="?",
         type=str,
-        default="data/documents/",
-        help="Path to a file or directory to ingest (default: data/documents/)",
+        default=settings.rag_documents_path,
+        help="Path to a file or directory to ingest (default: RAG_DOCUMENTS_PATH)",
     )
     parser.add_argument(
         "--title",
@@ -47,7 +49,7 @@ async def main() -> None:
         "--extensions",
         nargs="+",
         default=None,
-        help="File extensions to process (default: .pdf .txt .md)",
+        help="File extensions to process (default: RAG_SUPPORTED_EXTENSIONS)",
     )
     parser.add_argument(
         "--info",
@@ -61,15 +63,17 @@ async def main() -> None:
     )
 
     args = parser.parse_args()
-    settings = get_settings()
 
     # Initialize components
     llm_provider = GeminiProvider(
         api_key=settings.gemini_api_key,
         model=settings.llm_model,
+        fallback_models=settings.llm_fallback_model_list,
         embedding_model=settings.embedding_model,
+        embedding_fallback_models=settings.embedding_fallback_model_list,
         embedding_requests_per_minute=settings.embedding_requests_per_minute,
         embedding_max_retries=settings.embedding_max_retries,
+        embedding_base_retry_seconds=settings.embedding_base_retry_seconds,
     )
 
     detected_embedding_dim = await llm_provider.get_embedding_dimension()
@@ -80,6 +84,7 @@ async def main() -> None:
         port=settings.qdrant_port,
         collection_name=settings.qdrant_collection_name,
         vector_size=vector_size,
+        sparse_vector_name=settings.qdrant_sparse_vector_name,
     )
     await vector_store.initialize()
 
@@ -110,7 +115,10 @@ async def main() -> None:
         print(f"✅ Done! Created {count} chunks.")
     elif target.is_dir():
         print(f"\n📁 Ingesting directory: {target}")
-        count = await pipeline.ingest_directory(target, extensions=args.extensions)
+        count = await pipeline.ingest_directory(
+            target,
+            extensions=args.extensions or settings.rag_supported_extensions_list,
+        )
         print(f"✅ Done! Created {count} total chunks.")
     else:
         print(f"❌ Path not found: {target}", file=sys.stderr)

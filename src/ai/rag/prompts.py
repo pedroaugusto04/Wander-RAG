@@ -1,7 +1,13 @@
 """Prompt templates for the Wander Jr RAG pipeline."""
 
-SYSTEM_PROMPT = """\
-Você é o Wander Jr, o assistente virtual institucional do CEFET-MG campus Timóteo.
+from src.config.settings import (
+    DEFAULT_APP_ASSISTANT_NAME,
+    DEFAULT_APP_INSTITUTION_NAME,
+    DEFAULT_RAG_PROMPT_HISTORY_TURNS,
+)
+
+SYSTEM_PROMPT_TEMPLATE = """\
+Você é o {assistant_name}, o assistente virtual institucional do {institution_name}.
 Sua missão é ajudar os alunos tirando dúvidas de forma educada, direta e acessível.
 
 REGRAS OBRIGATÓRIAS:
@@ -18,6 +24,11 @@ REGRAS OBRIGATÓRIAS:
 11. Evite respostas genéricas como "Como posso ajudar?" quando o usuário já fez uma pergunta objetiva.
 12. Sempre que responder com informação factual, cite a fonte de forma breve e natural (ex: "Segundo o PPC..." ou "Conforme o guia da graduação...").
 """
+
+SYSTEM_PROMPT = SYSTEM_PROMPT_TEMPLATE.format(
+    assistant_name=DEFAULT_APP_ASSISTANT_NAME,
+    institution_name=DEFAULT_APP_INSTITUTION_NAME,
+)
 
 CONTEXT_TEMPLATE = """\
 ## INFORMAÇÕES INSTITUCIONAIS RELEVANTES:
@@ -54,6 +65,10 @@ def build_rag_prompt(
     user_question: str,
     retrieved_chunks: list[dict[str, str]],
     conversation_history: list[dict[str, str]] | None = None,
+    *,
+    assistant_name: str = DEFAULT_APP_ASSISTANT_NAME,
+    institution_name: str = DEFAULT_APP_INSTITUTION_NAME,
+    max_history_turns: int = DEFAULT_RAG_PROMPT_HISTORY_TURNS,
 ) -> list[dict[str, str]]:
     """Build the full prompt with system instruction, context, and question.
 
@@ -70,8 +85,8 @@ def build_rag_prompt(
     history_text = "(Início da conversa)"
     if conversation_history:
         history_lines = []
-        for turn in conversation_history[-6:]:  # Last 6 turns max
-            role = "Usuário" if turn["role"] == "user" else "Wander Jr"
+        for turn in conversation_history[-max_history_turns:]:
+            role = "Usuário" if turn["role"] == "user" else assistant_name
             history_lines.append(f"{role}: {turn['content']}")
         history_text = "\n".join(history_lines)
 
@@ -82,6 +97,12 @@ def build_rag_prompt(
     )
 
     return [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT_TEMPLATE.format(
+                assistant_name=assistant_name,
+                institution_name=institution_name,
+            ),
+        },
         {"role": "user", "content": user_content},
     ]

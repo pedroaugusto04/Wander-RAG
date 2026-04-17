@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from src.config.settings import DEFAULT_LLAMA_PARSE_TIER
 from src.knowledge.ingestion.pipeline import IngestionPipeline
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ async def auto_ingest_if_empty(
     chunk_overlap: int,
     embedding_batch_size: int,
     llama_api_key: str | None = None,
-    llama_parse_tier: str = "cost_effective",
+    llama_parse_tier: str = DEFAULT_LLAMA_PARSE_TIER,
     extensions: list[str] | None = None,
 ) -> int:
     """Ingest documents only when the target collection has no points."""

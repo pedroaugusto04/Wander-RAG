@@ -18,6 +18,15 @@ from qdrant_client.models import (
     VectorParams,
 )
 
+from src.config.settings import (
+    DEFAULT_EMBEDDING_DIMENSIONS,
+    DEFAULT_QDRANT_COLLECTION_NAME,
+    DEFAULT_QDRANT_HOST,
+    DEFAULT_QDRANT_PORT,
+    DEFAULT_QDRANT_SPARSE_VECTOR_NAME,
+    DEFAULT_RAG_SCORE_THRESHOLD,
+    DEFAULT_RAG_TOP_K,
+)
 from src.knowledge.vectorstore.base import VectorStore
 
 logger = logging.getLogger(__name__)
@@ -28,13 +37,15 @@ class QdrantVectorStore(VectorStore):
 
     def __init__(
         self,
-        host: str = "qdrant",
-        port: int = 6333,
-        collection_name: str = "documents",
-        vector_size: int = 768,
+        host: str = DEFAULT_QDRANT_HOST,
+        port: int = DEFAULT_QDRANT_PORT,
+        collection_name: str = DEFAULT_QDRANT_COLLECTION_NAME,
+        vector_size: int = DEFAULT_EMBEDDING_DIMENSIONS,
+        sparse_vector_name: str = DEFAULT_QDRANT_SPARSE_VECTOR_NAME,
     ) -> None:
         self.collection_name = collection_name
         self.vector_size = vector_size
+        self.sparse_vector_name = sparse_vector_name
         self.dense_vector_name: str | None = None
         self.client = AsyncQdrantClient(host=host, port=port)
 
@@ -50,12 +61,13 @@ class QdrantVectorStore(VectorStore):
                     size=self.vector_size,
                     distance=Distance.COSINE,
                 ),
-                sparse_vectors_config={"sparse-vector": SparseVectorParams()},
+                sparse_vectors_config={self.sparse_vector_name: SparseVectorParams()},
             )
             logger.info(
-                "Created Qdrant collection '%s' (dim=%d, sparse='sparse-vector')",
+                "Created Qdrant collection '%s' (dim=%d, sparse='%s')",
                 self.collection_name,
                 self.vector_size,
+                self.sparse_vector_name,
             )
         else:
             info = await self.client.get_collection(self.collection_name)
@@ -74,11 +86,12 @@ class QdrantVectorStore(VectorStore):
                 self.vector_size = existing_size
 
             sparse_names = self._extract_sparse_vector_names(info)
-            if sparse_names and "sparse-vector" not in sparse_names:
+            if sparse_names and self.sparse_vector_name not in sparse_names:
                 logger.warning(
-                    "Qdrant collection '%s' has sparse vectors %s; expected 'sparse-vector'.",
+                    "Qdrant collection '%s' has sparse vectors %s; expected '%s'.",
                     self.collection_name,
                     sorted(sparse_names),
+                    self.sparse_vector_name,
                 )
 
             logger.info(
@@ -109,7 +122,7 @@ class QdrantVectorStore(VectorStore):
         """Extract sparse vector names from collection info."""
         sparse_cfg = getattr(info.config.params, "sparse_vectors", None)
         if isinstance(sparse_cfg, Mapping):
-            return {str(name) for name in sparse_cfg.keys() if name}
+            return {str(name) for name in sparse_cfg if name}
         return set()
 
     async def upsert(
@@ -145,8 +158,8 @@ class QdrantVectorStore(VectorStore):
     async def search(
         self,
         query_embedding: list[float],
-        top_k: int = 5,
-        score_threshold: float = 0.3,
+        top_k: int = DEFAULT_RAG_TOP_K,
+        score_threshold: float = DEFAULT_RAG_SCORE_THRESHOLD,
         filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Search for similar vectors with optional metadata filtering."""

@@ -7,14 +7,24 @@ import logging
 import random
 import re
 import time
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from google import genai
 from google.genai import types
 
 from src.ai.llm.base import LLMProvider, LLMResponse
+from src.config.settings import (
+    DEFAULT_EMBEDDING_BASE_RETRY_SECONDS,
+    DEFAULT_EMBEDDING_MAX_RETRIES,
+    DEFAULT_EMBEDDING_MODEL,
+    DEFAULT_EMBEDDING_REQUESTS_PER_MINUTE,
+    DEFAULT_LLM_MODEL,
+)
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class GeminiProvider(LLMProvider):
@@ -23,13 +33,13 @@ class GeminiProvider(LLMProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.5-flash",
+        model: str = DEFAULT_LLM_MODEL,
         fallback_models: Sequence[str] | None = None,
-        embedding_model: str = "models/gemini-embedding-001",
+        embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         embedding_fallback_models: Sequence[str] | None = None,
-        embedding_requests_per_minute: int = 60,
-        embedding_max_retries: int = 5,
-        embedding_base_retry_seconds: float = 2.0,
+        embedding_requests_per_minute: int = DEFAULT_EMBEDDING_REQUESTS_PER_MINUTE,
+        embedding_max_retries: int = DEFAULT_EMBEDDING_MAX_RETRIES,
+        embedding_base_retry_seconds: float = DEFAULT_EMBEDDING_BASE_RETRY_SECONDS,
     ) -> None:
         self.model = model
         self.fallback_models = self._normalize_model_list(fallback_models)

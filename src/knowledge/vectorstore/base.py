@@ -5,6 +5,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+from src.config.settings import DEFAULT_RAG_SCORE_THRESHOLD, DEFAULT_RAG_TOP_K
+
 
 class VectorStore(ABC):
     """Contract for vector store implementations (Qdrant, etc.)."""
@@ -29,8 +31,8 @@ class VectorStore(ABC):
     async def search(
         self,
         query_embedding: list[float],
-        top_k: int = 5,
-        score_threshold: float = 0.3,
+        top_k: int = DEFAULT_RAG_TOP_K,
+        score_threshold: float = DEFAULT_RAG_SCORE_THRESHOLD,
         filter_metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Search for similar vectors. Returns list of {content, score, metadata}."""

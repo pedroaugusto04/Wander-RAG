@@ -2,7 +2,7 @@
 
 Assistente inteligente do **CEFET-MG campus Timóteo** baseado em IA (LLM + RAG), capaz de responder dúvidas de alunos usando documentos oficiais da instituição.
 
-- **LLM**: Google Gemini 2.0 Flash (free tier)
+- **LLM**: Google Gemini 2.5 Flash
 - **Vector DB**: Qdrant (self-hosted)
 - **Database**: PostgreSQL 16
 - **Framework**: FastAPI + python-telegram-bot
@@ -13,10 +13,17 @@ Assistente inteligente do **CEFET-MG campus Timóteo** baseado em IA (LLM + RAG)
 ```bash
 cp .env.example .env
 # Edite .env com suas chaves (TELEGRAM_BOT_TOKEN, GEMINI_API_KEY)
+# O projeto também aceita `.env.local` para sobrescritas locais não versionadas
 # Opcional: configure fallback automático de modelos
 # LLM_FALLBACK_MODELS=gemini-3.1-flash-lite,gemma-3-12b
 # EMBEDDING_FALLBACK_MODELS=models/gemini-embedding-001
 ```
+
+Algumas observações úteis:
+- `DATABASE_URL` é opcional. Se ficar vazio, ela é montada automaticamente a partir de `POSTGRES_*`.
+- As respostas institucionais fixas e metadados do app agora podem ser ajustados por `APP_*`.
+- Configurações de retrieval e ingestão ficam concentradas em `RAG_*`.
+- Configurações de Docker/Compose ficam no final do `.env.example`.
 
 ### 2. Suba os serviços
 
@@ -38,13 +45,17 @@ docker compose exec app python scripts/ingest_documents.py --info .
 ```
 
 Se estiver batendo quota de embedding no Gemini, ajuste no `.env`:
-`EMBEDDING_REQUESTS_PER_MINUTE`, `EMBEDDING_MAX_RETRIES`, `RAG_EMBEDDING_BATCH_SIZE`.
+`EMBEDDING_REQUESTS_PER_MINUTE`, `EMBEDDING_MAX_RETRIES`,
+`EMBEDDING_BASE_RETRY_SECONDS`, `RAG_EMBEDDING_BATCH_SIZE`.
 
 Para fallback automático de chat e embedding, ajuste também:
 `LLM_FALLBACK_MODELS` e `EMBEDDING_FALLBACK_MODELS`.
 
 Para ligar/desligar reranker no `.env`:
 `RERANKER_ENABLED=true` (ligado) ou `RERANKER_ENABLED=false` (desligado).
+
+Para perguntas em formato de lista e histórico do prompt, ajuste:
+`RAG_LIST_QUERY_MIN_TOP_K` e `RAG_PROMPT_HISTORY_TURNS`.
 
 ### 4. Configure o webhook do Telegram
 

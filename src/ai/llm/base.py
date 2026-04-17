@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
+from src.config.settings import DEFAULT_LLM_MAX_TOKENS, DEFAULT_LLM_TEMPERATURE
+
 
 @dataclass
 class LLMResponse:
@@ -25,8 +27,8 @@ class LLMProvider(ABC):
     async def generate(
         self,
         messages: list[dict[str, str]],
-        temperature: float = 0.3,
-        max_tokens: int = 1024,
+        temperature: float = DEFAULT_LLM_TEMPERATURE,
+        max_tokens: int = DEFAULT_LLM_MAX_TOKENS,
     ) -> LLMResponse:
         """Generate a completion from the model."""
         ...

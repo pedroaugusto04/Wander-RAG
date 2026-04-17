@@ -9,6 +9,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from src.config.settings import DEFAULT_RERANKER_MODEL, DEFAULT_RERANKER_TOP_K
+
 if TYPE_CHECKING:
     from src.core.models import RetrievedChunk
 
@@ -25,8 +27,8 @@ class FlashRankReranker:
 
     def __init__(
         self,
-        model_name: str = "ms-marco-MultiBERT-L-12",
-        top_k: int = 5,
+        model_name: str = DEFAULT_RERANKER_MODEL,
+        top_k: int = DEFAULT_RERANKER_TOP_K,
     ) -> None:
         from flashrank import Ranker
 

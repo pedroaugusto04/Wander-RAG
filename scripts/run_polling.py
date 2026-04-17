@@ -10,11 +10,10 @@ Perfect for local testing.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import logging
 import sys
 from pathlib import Path
-
-import fcntl
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -30,6 +29,7 @@ from src.core.models import ChannelType, IncomingMessage
 from src.core.orchestrator import AIOrchestrator
 from src.infra.conversation_store import PostgresConversationStore
 from src.infra.database import create_db_engine
+from src.infra.logging import setup_logging
 from src.knowledge.ingestion.pipeline import IngestionPipeline
 from src.knowledge.vectorstore.qdrant_store import QdrantVectorStore
 
@@ -65,9 +65,12 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
     llm_provider = GeminiProvider(
         api_key=settings.gemini_api_key,
         model=settings.llm_model,
+        fallback_models=settings.llm_fallback_model_list,
         embedding_model=settings.embedding_model,
+        embedding_fallback_models=settings.embedding_fallback_model_list,
         embedding_requests_per_minute=settings.embedding_requests_per_minute,
         embedding_max_retries=settings.embedding_max_retries,
+        embedding_base_retry_seconds=settings.embedding_base_retry_seconds,
     )
 
     detected_embedding_dim = await llm_provider.get_embedding_dimension()
@@ -79,8 +82,18 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
         port=settings.qdrant_port,
         collection_name=settings.qdrant_collection_name,
         vector_size=vector_size,
+        sparse_vector_name=settings.qdrant_sparse_vector_name,
     )
     await vector_store.initialize()
+
+    reranker = None
+    if settings.reranker_enabled:
+        from src.ai.rag.reranker import FlashRankReranker
+
+        reranker = FlashRankReranker(
+            model_name=settings.reranker_model,
+            top_k=settings.reranker_top_k,
+        )
 
     # RAG Pipeline
     rag_pipeline = RAGPipeline(
@@ -88,6 +101,14 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
         llm_provider=llm_provider,
         top_k=settings.rag_top_k,
         score_threshold=settings.rag_score_threshold,
+        confidence_none_threshold=settings.rag_confidence_none_threshold,
+        confidence_low_threshold=settings.rag_confidence_low_threshold,
+        reranker=reranker,
+        retrieval_multiplier=settings.reranker_retrieval_multiplier,
+        list_query_min_top_k=settings.rag_list_query_min_top_k,
+        assistant_name=settings.app_assistant_name,
+        institution_name=settings.app_institution_name,
+        prompt_history_turns=settings.rag_prompt_history_turns,
     )
 
     # AI Orchestrator
@@ -106,6 +127,14 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
     conversation_manager = ConversationManager(
         orchestrator=orchestrator,
         conversation_store=conversation_store,
+        session_timeout_minutes=settings.app_session_timeout_minutes,
+        max_history_turns=settings.app_max_history_turns,
+        assistant_name=settings.app_assistant_name,
+        institution_name=settings.app_institution_name,
+        sigaa_url=settings.app_sigaa_url,
+        secretaria_phone=settings.app_secretaria_phone,
+        secretaria_email=settings.app_secretaria_email,
+        diretoria_email=settings.app_diretoria_email,
     )
 
     return conversation_manager, vector_store, llm_provider
@@ -129,6 +158,8 @@ async def run_manual_ingest(
         chunk_size=chunk_size or settings.rag_chunk_size,
         chunk_overlap=chunk_overlap or settings.rag_chunk_overlap,
         embedding_batch_size=embedding_batch_size or settings.rag_embedding_batch_size,
+        llama_api_key=settings.llama_cloud_api_key,
+        llama_parse_tier=settings.llama_parse_tier,
     )
 
     target = Path(path)
@@ -137,7 +168,10 @@ async def run_manual_ingest(
 
     if target.is_file():
         return await pipeline.ingest_file(target)
-    return await pipeline.ingest_directory(target, extensions=extensions)
+    return await pipeline.ingest_directory(
+        target,
+        extensions=extensions or settings.rag_supported_extensions_list,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -181,9 +215,10 @@ def main() -> None:
     args = parse_args()
     lock_file = _acquire_single_instance_lock()
     settings = get_settings()
+    setup_logging(log_level=settings.app_log_level)
 
     logger.info("=" * 50)
-    logger.info("🤖 Wander Jr — Modo Polling (desenvolvimento)")
+    logger.info("🤖 %s — Modo Polling (%s)", settings.app_name, settings.app_env)
     logger.info("=" * 50)
 
     # Build the telegram application
@@ -267,7 +302,8 @@ def main() -> None:
         if not update.message:
             return
         await update.message.reply_text(
-            "👋 Olá! Eu sou o **Wander Jr**, o assistente virtual do CEFET-MG campus Timóteo.\n\n"
+            f"👋 Olá! Eu sou o **{settings.app_assistant_name}**, o assistente virtual do "
+            f"{settings.app_institution_name}.\n\n"
             "Posso te ajudar com informações sobre a instituição baseadas nos "
             "documentos oficiais.\n\n"
             "💬 É só me perguntar! Por exemplo:\n"

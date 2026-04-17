@@ -46,6 +46,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedding_fallback_models=settings.embedding_fallback_model_list,
         embedding_requests_per_minute=settings.embedding_requests_per_minute,
         embedding_max_retries=settings.embedding_max_retries,
+        embedding_base_retry_seconds=settings.embedding_base_retry_seconds,
     )
 
     detected_embedding_dim = await llm_provider.get_embedding_dimension()
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         port=settings.qdrant_port,
         collection_name=settings.qdrant_collection_name,
         vector_size=vector_size,
+        sparse_vector_name=settings.qdrant_sparse_vector_name,
     )
     await vector_store.initialize()
 
@@ -86,6 +88,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         confidence_low_threshold=settings.rag_confidence_low_threshold,
         reranker=reranker,
         retrieval_multiplier=settings.reranker_retrieval_multiplier,
+        list_query_min_top_k=settings.rag_list_query_min_top_k,
+        assistant_name=settings.app_assistant_name,
+        institution_name=settings.app_institution_name,
+        prompt_history_turns=settings.rag_prompt_history_turns,
     )
 
 
@@ -104,6 +110,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     conversation_manager = ConversationManager(
         orchestrator=orchestrator,
         conversation_store=conversation_store,
+        session_timeout_minutes=settings.app_session_timeout_minutes,
+        max_history_turns=settings.app_max_history_turns,
+        assistant_name=settings.app_assistant_name,
+        institution_name=settings.app_institution_name,
+        sigaa_url=settings.app_sigaa_url,
+        secretaria_phone=settings.app_secretaria_phone,
+        secretaria_email=settings.app_secretaria_email,
+        diretoria_email=settings.app_diretoria_email,
     )
 
 
@@ -133,9 +147,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Application factory."""
+    settings = get_settings()
     app = FastAPI(
-        title="Wander Jr",
-        description="Assistente inteligente institucional do CEFET-MG campus Timóteo",
+        title=settings.app_name,
+        description=settings.app_description,
         version="0.1.0",
         lifespan=lifespan,
     )
@@ -145,7 +160,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:
-        return {"status": "ok", "service": "wander-jr"}
+        return {"status": "ok", "service": settings.app_service_name}
 
     return app
 

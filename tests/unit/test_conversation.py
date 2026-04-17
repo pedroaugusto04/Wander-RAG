@@ -91,7 +91,7 @@ def _make_message(text: str) -> IncomingMessage:
         ("/start", "Olá! Sou o Wander Jr"),
         ("/ajuda", "Posso buscar informações"),
         ("/sigaa", "https://sig.cefetmg.br/sigaa/"),
-        ("/contato", "Contatos - Campus Timóteo"),
+        ("/contato", "Contatos - CEFET-MG campus Timóteo"),
     ],
 )
 async def test_static_commands_skip_ai_and_persist_both_turns(

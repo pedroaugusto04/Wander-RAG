@@ -9,6 +9,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from src.config.settings import DEFAULT_RAG_CHUNK_OVERLAP, DEFAULT_RAG_CHUNK_SIZE
+
 # ---------------------------------------------------------------------------
 # Public data model
 # ---------------------------------------------------------------------------
@@ -49,7 +51,11 @@ class MarkdownChunker:
 
     SEPARATORS = ["\n\n", "\n", ". ", " "]
 
-    def __init__(self, chunk_size: int = 512, chunk_overlap: int = 64) -> None:
+    def __init__(
+        self,
+        chunk_size: int = DEFAULT_RAG_CHUNK_SIZE,
+        chunk_overlap: int = DEFAULT_RAG_CHUNK_OVERLAP,
+    ) -> None:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
 

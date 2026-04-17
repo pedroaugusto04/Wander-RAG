@@ -4,14 +4,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wander-jr
+    container_name: ${APP_CONTAINER_NAME:-wander-jr}
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${APP_BIND_PORT:-8000}:${APP_PORT:-8000}"
     env_file:
       - .env
     volumes:
-      - ./data/documents:/app/data/documents
+      - ${HOST_DOCUMENTS_PATH:-./data/documents}:${APP_DOCUMENTS_MOUNT_PATH:-/app/data/documents}
     depends_on:
       postgres:
         condition: service_healthy
@@ -20,15 +20,15 @@ services:
 
   # ── PostgreSQL ──
   postgres:
-    image: postgres:16-alpine
-    container_name: wander-postgres
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: ${POSTGRES_CONTAINER_NAME:-wander-postgres}
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-wander}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wander}
       POSTGRES_DB: ${POSTGRES_DB:-wander_db}
     ports:
-      - "5436:5432"
+      - "${POSTGRES_BIND_PORT:-5436}:${POSTGRES_PORT:-5432}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -39,18 +39,18 @@ services:
 
   # ── Qdrant Vector Database ──
   qdrant:
-    image: qdrant/qdrant:latest
-    container_name: wander-qdrant
+    image: ${QDRANT_IMAGE:-qdrant/qdrant:latest}
+    container_name: ${QDRANT_CONTAINER_NAME:-wander-qdrant}
     restart: unless-stopped
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "${QDRANT_PORT:-6333}:${QDRANT_PORT:-6333}"
+      - "${QDRANT_GRPC_PORT:-6334}:${QDRANT_GRPC_PORT:-6334}"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
-      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__SERVICE__GRPC_PORT: ${QDRANT_GRPC_PORT:-6334}
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/6333' || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/${QDRANT_PORT:-6333}' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5

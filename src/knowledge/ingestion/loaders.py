@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from src.config.settings import DEFAULT_LLAMA_PARSE_TIER
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -22,7 +24,7 @@ class DocumentLoader:
     def __init__(
         self,
         llama_api_key: str | None = None,
-        llama_parse_tier: str = "cost_effective",
+        llama_parse_tier: str = DEFAULT_LLAMA_PARSE_TIER,
     ) -> None:
         self._llama_api_key = llama_api_key or None
         self._llama_parse_tier = llama_parse_tier

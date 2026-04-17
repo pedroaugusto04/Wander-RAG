@@ -11,6 +11,7 @@ from src.ai.rag.prompts import (
     LOW_CONFIDENCE_DISCLAIMER,
     NO_CONTEXT_RESPONSE,
 )
+from src.config.settings import DEFAULT_LLM_MAX_TOKENS, DEFAULT_LLM_TEMPERATURE
 
 if TYPE_CHECKING:
     from src.ai.llm.base import LLMProvider, LLMResponse
@@ -27,8 +28,8 @@ class AIOrchestrator:
         self,
         llm_provider: LLMProvider,
         rag_pipeline: RAGPipeline,
-        temperature: float = 0.3,
-        max_tokens: int = 1024,
+        temperature: float = DEFAULT_LLM_TEMPERATURE,
+        max_tokens: int = DEFAULT_LLM_MAX_TOKENS,
     ) -> None:
         self.llm = llm_provider
         self.rag = rag_pipeline

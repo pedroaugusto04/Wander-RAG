@@ -5,14 +5,16 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from src.core.models import ConversationContext, MessageRole
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+    from src.core.models import ConversationContext, MessageRole
 
 
 class PostgresConversationStore:

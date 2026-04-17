@@ -6,6 +6,11 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
+from src.config.settings import (
+    DEFAULT_RAG_LIST_QUERY_MIN_TOP_K,
+    DEFAULT_RAG_SCORE_THRESHOLD,
+    DEFAULT_RAG_TOP_K,
+)
 from src.core.models import RetrievedChunk
 
 if TYPE_CHECKING:
@@ -28,10 +33,11 @@ class RAGRetriever:
         self,
         vector_store: VectorStore,
         llm_provider: LLMProvider,
-        top_k: int = 5,
-        score_threshold: float = 0.3,
+        top_k: int = DEFAULT_RAG_TOP_K,
+        score_threshold: float = DEFAULT_RAG_SCORE_THRESHOLD,
         reranker: FlashRankReranker | None = None,
         retrieval_multiplier: int = 3,
+        list_query_min_top_k: int = DEFAULT_RAG_LIST_QUERY_MIN_TOP_K,
     ) -> None:
         self.vector_store = vector_store
         self.llm_provider = llm_provider
@@ -39,6 +45,7 @@ class RAGRetriever:
         self.score_threshold = score_threshold
         self.reranker = reranker
         self.retrieval_multiplier = retrieval_multiplier
+        self.list_query_min_top_k = max(1, list_query_min_top_k)
 
     async def retrieve(
         self,
@@ -131,7 +138,7 @@ class RAGRetriever:
     def _effective_top_k(self, query: str, requested_k: int) -> int:
         """Increase context budget for list-style questions that need more chunks."""
         if self._is_list_query(query):
-            return max(requested_k, 8)
+            return max(requested_k, self.list_query_min_top_k)
         return requested_k
 
     def _select_final_chunks(

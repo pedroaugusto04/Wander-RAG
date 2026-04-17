@@ -7,6 +7,16 @@ from typing import TYPE_CHECKING, Any
 
 from src.ai.rag.prompts import build_rag_prompt
 from src.ai.rag.retriever import RAGRetriever
+from src.config.settings import (
+    DEFAULT_APP_ASSISTANT_NAME,
+    DEFAULT_APP_INSTITUTION_NAME,
+    DEFAULT_RAG_CONFIDENCE_LOW_THRESHOLD,
+    DEFAULT_RAG_CONFIDENCE_NONE_THRESHOLD,
+    DEFAULT_RAG_LIST_QUERY_MIN_TOP_K,
+    DEFAULT_RAG_PROMPT_HISTORY_TURNS,
+    DEFAULT_RAG_SCORE_THRESHOLD,
+    DEFAULT_RAG_TOP_K,
+)
 
 if TYPE_CHECKING:
     from src.ai.llm.base import LLMProvider
@@ -24,12 +34,16 @@ class RAGPipeline:
         self,
         vector_store: VectorStore,
         llm_provider: LLMProvider,
-        top_k: int = 5,
-        score_threshold: float = 0.3,
-        confidence_none_threshold: float = 0.35,
-        confidence_low_threshold: float = 0.6,
+        top_k: int = DEFAULT_RAG_TOP_K,
+        score_threshold: float = DEFAULT_RAG_SCORE_THRESHOLD,
+        confidence_none_threshold: float = DEFAULT_RAG_CONFIDENCE_NONE_THRESHOLD,
+        confidence_low_threshold: float = DEFAULT_RAG_CONFIDENCE_LOW_THRESHOLD,
         reranker: FlashRankReranker | None = None,
         retrieval_multiplier: int = 3,
+        list_query_min_top_k: int = DEFAULT_RAG_LIST_QUERY_MIN_TOP_K,
+        assistant_name: str = DEFAULT_APP_ASSISTANT_NAME,
+        institution_name: str = DEFAULT_APP_INSTITUTION_NAME,
+        prompt_history_turns: int = DEFAULT_RAG_PROMPT_HISTORY_TURNS,
     ) -> None:
         self.retriever = RAGRetriever(
             vector_store=vector_store,
@@ -38,12 +52,16 @@ class RAGPipeline:
             score_threshold=score_threshold,
             reranker=reranker,
             retrieval_multiplier=retrieval_multiplier,
+            list_query_min_top_k=list_query_min_top_k,
         )
         self.confidence_none_threshold = confidence_none_threshold
         self.confidence_low_threshold = max(
             confidence_low_threshold,
             confidence_none_threshold,
         )
+        self.assistant_name = assistant_name
+        self.institution_name = institution_name
+        self.prompt_history_turns = max(1, prompt_history_turns)
 
     async def process(
         self,
@@ -89,6 +107,9 @@ class RAGPipeline:
             user_question=query,
             retrieved_chunks=chunk_dicts,
             conversation_history=conversation_history,
+            assistant_name=self.assistant_name,
+            institution_name=self.institution_name,
+            max_history_turns=self.prompt_history_turns,
         )
 
         return {
