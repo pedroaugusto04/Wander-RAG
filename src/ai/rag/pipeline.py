@@ -26,6 +26,8 @@ class RAGPipeline:
         llm_provider: LLMProvider,
         top_k: int = 5,
         score_threshold: float = 0.3,
+        confidence_none_threshold: float = 0.35,
+        confidence_low_threshold: float = 0.6,
         reranker: FlashRankReranker | None = None,
         retrieval_multiplier: int = 3,
     ) -> None:
@@ -36,6 +38,11 @@ class RAGPipeline:
             score_threshold=score_threshold,
             reranker=reranker,
             retrieval_multiplier=retrieval_multiplier,
+        )
+        self.confidence_none_threshold = confidence_none_threshold
+        self.confidence_low_threshold = max(
+            confidence_low_threshold,
+            confidence_none_threshold,
         )
 
     async def process(
@@ -55,10 +62,17 @@ class RAGPipeline:
         """
         chunks: list[RetrievedChunk] = await self.retriever.retrieve(query)
 
-        max_score = max((c.score for c in chunks), default=0.0)
-        if not chunks or max_score < 0.3:
+        # Prefer dense retrieval score for confidence when available.
+        max_score = max(
+            (
+                float(c.metadata.get("vector_score", c.score))
+                for c in chunks
+            ),
+            default=0.0,
+        )
+        if not chunks or max_score < self.confidence_none_threshold:
             confidence = "none"
-        elif max_score < 0.6:
+        elif max_score < self.confidence_low_threshold:
             confidence = "low"
         else:
             confidence = "high"

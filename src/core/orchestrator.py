@@ -61,9 +61,19 @@ class AIOrchestrator:
         start_time = time.monotonic()
 
         try:
+            conversation_history = context.get_recent_history() if context else None
+            # ConversationManager stores the current user turn before calling the orchestrator.
+            # Remove it from history to avoid duplicating the same question in the prompt.
+            if (
+                conversation_history
+                and conversation_history[-1].get("role") == "user"
+                and conversation_history[-1].get("content", "").strip() == message.text.strip()
+            ):
+                conversation_history = conversation_history[:-1]
+
             rag_result = await self.rag.process(
                 query=message.text,
-                conversation_history=context.get_recent_history() if context else None,
+                conversation_history=conversation_history,
             )
 
             confidence: str = rag_result["confidence"]

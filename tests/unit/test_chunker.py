@@ -1,58 +1,45 @@
-"""Tests for the text chunker."""
+"""Tests for the markdown chunker."""
 
-from src.knowledge.ingestion.chunker import TextChunker
+from src.knowledge.ingestion.chunker import MarkdownChunker
 
 
-class TestTextChunker:
+class TestMarkdownChunker:
     def test_empty_text(self) -> None:
-        chunker = TextChunker(chunk_size=100, chunk_overlap=10)
+        chunker = MarkdownChunker(chunk_size=100, chunk_overlap=10)
         assert chunker.chunk("") == []
         assert chunker.chunk("   ") == []
 
     def test_short_text_single_chunk(self) -> None:
-        chunker = TextChunker(chunk_size=500, chunk_overlap=50)
-        text = "This is a short text."
-        chunks = chunker.chunk(text)
+        chunker = MarkdownChunker(chunk_size=500, chunk_overlap=50)
+        chunks = chunker.chunk("This is a short text.")
         assert len(chunks) == 1
-        assert chunks[0] == text
+        assert chunks[0].content == "This is a short text."
 
-    def test_splits_on_paragraphs(self) -> None:
-        chunker = TextChunker(chunk_size=50, chunk_overlap=10)
-        text = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."
-        chunks = chunker.chunk(text)
-        assert len(chunks) >= 2
-        assert "First paragraph" in chunks[0]
-
-    def test_overlap_present(self) -> None:
-        chunker = TextChunker(chunk_size=30, chunk_overlap=10)
-        text = "AAAA BBBB CCCC. DDDD EEEE FFFF. GGGG HHHH IIII."
-        chunks = chunker.chunk(text)
-        # With overlap, later chunks should contain text from the end of previous chunks
-        assert len(chunks) >= 2
-
-    def test_normalizes_whitespace(self) -> None:
-        chunker = TextChunker(chunk_size=500, chunk_overlap=50)
-        text = "Hello\n\n\n\n\nWorld  with   extra   spaces"
-        chunks = chunker.chunk(text)
+    def test_keeps_heading_breadcrumb(self) -> None:
+        chunker = MarkdownChunker(chunk_size=500, chunk_overlap=50)
+        markdown = "# Curso\n\n## Professores\n\nLista de docentes."
+        chunks = chunker.chunk(markdown)
         assert len(chunks) == 1
-        assert "\n\n\n" not in chunks[0]
-        assert "  " not in chunks[0]
+        assert chunks[0].section_breadcrumb == "Curso > Professores"
+        assert chunks[0].content.startswith("[Curso > Professores]")
 
     def test_long_text_creates_multiple_chunks(self) -> None:
-        chunker = TextChunker(chunk_size=100, chunk_overlap=20)
-        text = " ".join([f"Word{i}" for i in range(200)])
-        chunks = chunker.chunk(text)
+        chunker = MarkdownChunker(chunk_size=100, chunk_overlap=20)
+        markdown = "# Titulo\n\n" + " ".join([f"Word{i}" for i in range(200)])
+        chunks = chunker.chunk(markdown)
         assert len(chunks) > 1
+        assert all(chunk.content for chunk in chunks)
 
-
-class TestTextChunkerEdgeCases:
-    def test_single_word(self) -> None:
-        chunker = TextChunker(chunk_size=100, chunk_overlap=10)
-        chunks = chunker.chunk("Hello")
-        assert chunks == ["Hello"]
-
-    def test_chunk_size_equals_text(self) -> None:
-        text = "A" * 100
-        chunker = TextChunker(chunk_size=100, chunk_overlap=10)
-        chunks = chunker.chunk(text)
-        assert len(chunks) == 1
+    def test_table_is_preserved(self) -> None:
+        chunker = MarkdownChunker(chunk_size=120, chunk_overlap=20)
+        markdown = (
+            "# Docentes\n\n"
+            "| Nome | Email |\n"
+            "|---|---|\n"
+            "| Ana | ana@cefetmg.br |\n"
+            "| Bia | bia@cefetmg.br |\n"
+        )
+        chunks = chunker.chunk(markdown)
+        combined = "\n".join(c.content for c in chunks)
+        assert "| Nome | Email |" in combined
+        assert "ana@cefetmg.br" in combined

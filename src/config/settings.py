@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     rag_chunk_size: int = Field(default=512)
     rag_chunk_overlap: int = Field(default=64)
     rag_top_k: int = Field(default=5)
-    rag_score_threshold: float = Field(default=0.3)
+    rag_score_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    rag_confidence_none_threshold: float = Field(default=0.35, ge=0.0, le=1.0)
+    rag_confidence_low_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     rag_documents_path: str = Field(default="data/documents")
 
     # --- Document Parsing ---

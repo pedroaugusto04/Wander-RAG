@@ -53,5 +53,5 @@ class TestBuildRagPrompt:
         assert "Wander Jr" in SYSTEM_PROMPT
         assert "CEFET-MG" in SYSTEM_PROMPT
         assert "Nunca invente" in SYSTEM_PROMPT
-        assert "não encontrou a informação no documento/contexto" in SYSTEM_PROMPT
+        assert "não encontrou essa informação" in SYSTEM_PROMPT
         assert "não invente números, limites ou exceções" in CONTEXT_TEMPLATE

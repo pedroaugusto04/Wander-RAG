@@ -54,11 +54,13 @@ class RAGRetriever:
         4. Filters by score threshold.
         5. Returns ranked chunks.
         """
-        k = top_k or self.top_k
-        threshold = score_threshold or self.score_threshold
+        k = top_k if top_k is not None else self.top_k
+        threshold = score_threshold if score_threshold is not None else self.score_threshold
 
         # Over-fetch when a reranker is available.
         fetch_k = k * self.retrieval_multiplier if self.reranker else k
+        # For two-stage retrieval, keep dense search permissive and let reranker decide.
+        search_threshold = 0.0 if self.reranker else threshold
 
         target_dimensions = getattr(self.vector_store, "vector_size", None)
         embeddings = await self.llm_provider.generate_embeddings(
@@ -70,7 +72,7 @@ class RAGRetriever:
         results = await self.vector_store.search(
             query_embedding=query_embedding,
             top_k=fetch_k,
-            score_threshold=threshold,
+            score_threshold=search_threshold,
             filter_metadata=filter_metadata,
         )
 
@@ -86,17 +88,25 @@ class RAGRetriever:
         # ── Rerank stage ──────────────────────────────────────────────
         if self.reranker and chunks:
             chunks = self.reranker.rerank(query=query, chunks=chunks, top_k=k)
+            # Keep only passages that still satisfy the original dense similarity threshold.
+            chunks = [
+                c
+                for c in chunks
+                if float(c.metadata.get("vector_score", c.score)) >= threshold
+            ]
             logger.info(
-                "Reranked %d→%d chunks for query (top rerank=%.3f): %s",
+                "Reranked %d→%d chunks (threshold=%.3f, top rerank=%.3f): %s",
                 fetch_k,
                 len(chunks),
+                threshold,
                 chunks[0].score if chunks else 0.0,
                 query[:80],
             )
         else:
             logger.info(
-                "Retrieved %d chunks for query (top score: %.3f): %s",
+                "Retrieved %d chunks for query (threshold=%.3f, top score: %.3f): %s",
                 len(chunks),
+                threshold,
                 chunks[0].score if chunks else 0.0,
                 query[:80],
             )

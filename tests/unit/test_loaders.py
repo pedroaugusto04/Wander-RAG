@@ -1,35 +1,34 @@
 """Tests for document loaders."""
 
-import tempfile
 from pathlib import Path
 
-from src.knowledge.ingestion.loaders import load_document
+import pytest
+
+from src.knowledge.ingestion.loaders import DocumentLoader
 
 
-class TestTextLoader:
-    def test_load_txt_file(self) -> None:
-        with tempfile.NamedTemporaryFile(suffix=".txt", mode="w", delete=False) as f:
-            f.write("Hello, this is a test document.")
-            f.flush()
-            text = load_document(Path(f.name))
+class TestDocumentLoader:
+    async def test_load_txt_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.txt"
+        path.write_text("Hello, this is a test document.", encoding="utf-8")
+
+        loader = DocumentLoader()
+        text = await loader.load(path)
         assert text == "Hello, this is a test document."
 
-    def test_load_md_file(self) -> None:
-        with tempfile.NamedTemporaryFile(suffix=".md", mode="w", delete=False) as f:
-            f.write("# Title\n\nSome content here.")
-            f.flush()
-            text = load_document(Path(f.name))
+    async def test_load_md_file(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.md"
+        path.write_text("# Title\n\nSome content here.", encoding="utf-8")
+
+        loader = DocumentLoader()
+        text = await loader.load(path)
         assert "# Title" in text
         assert "Some content here." in text
 
+    async def test_raises_on_unsupported(self, tmp_path: Path) -> None:
+        path = tmp_path / "doc.xyz"
+        path.write_bytes(b"data")
 
-class TestUnsupportedFormat:
-    def test_raises_on_unsupported(self) -> None:
-        with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False) as f:
-            f.write(b"data")
-            f.flush()
-            try:
-                load_document(Path(f.name))
-                raise AssertionError("Should have raised ValueError")
-            except ValueError as e:
-                assert "Unsupported" in str(e)
+        loader = DocumentLoader()
+        with pytest.raises(ValueError, match="Unsupported"):
+            await loader.load(path)

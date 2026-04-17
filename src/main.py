@@ -82,6 +82,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         llm_provider=llm_provider,
         top_k=settings.rag_top_k,
         score_threshold=settings.rag_score_threshold,
+        confidence_none_threshold=settings.rag_confidence_none_threshold,
+        confidence_low_threshold=settings.rag_confidence_low_threshold,
         reranker=reranker,
         retrieval_multiplier=settings.reranker_retrieval_multiplier,
     )
