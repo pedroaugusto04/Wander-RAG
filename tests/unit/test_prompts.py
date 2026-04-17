@@ -1,5 +1,6 @@
 """Tests for prompt building."""
 
+from src.ai.rag.pipeline import RAGPipeline
 from src.ai.rag.prompts import CONTEXT_TEMPLATE, SYSTEM_PROMPT, build_rag_prompt
 
 
@@ -54,4 +55,20 @@ class TestBuildRagPrompt:
         assert "CEFET-MG" in SYSTEM_PROMPT
         assert "Nunca invente" in SYSTEM_PROMPT
         assert "não encontrou essa informação" in SYSTEM_PROMPT
-        assert "não invente números, limites ou exceções" in CONTEXT_TEMPLATE
+        assert "sem mencionar \"contexto\"" in CONTEXT_TEMPLATE
+        assert "Nunca use termos técnicos como \"contexto\"" in SYSTEM_PROMPT
+
+
+class TestRagPipelineSourceLabels:
+    def test_build_chunk_source_includes_section_breadcrumb(self) -> None:
+        source = RAGPipeline._build_chunk_source(
+            {
+                "document_title": "docentes",
+                "section_breadcrumb": "DECOM-TM > Professor: Adilson Mendes Ricardo",
+            }
+        )
+        assert source == "docentes — DECOM-TM > Professor: Adilson Mendes Ricardo"
+
+    def test_build_chunk_source_falls_back_to_title_only(self) -> None:
+        source = RAGPipeline._build_chunk_source({"document_title": "manual"})
+        assert source == "manual"

@@ -248,12 +248,14 @@ class MarkdownChunker:
         result: list[str] = [chunks[0].strip()]
 
         for i in range(1, len(chunks)):
-            prev = chunks[i - 1]
-            overlap = prev[-self.chunk_overlap:] if len(prev) > self.chunk_overlap else prev
+            overlap = self._word_safe_overlap(chunks[i - 1])
 
             merged = f"{overlap} {chunks[i]}".strip()
             if len(merged) > target_size + self.chunk_overlap:
-                merged = merged[: target_size + self.chunk_overlap]
+                merged = self._trim_to_boundary(
+                    merged,
+                    target_size + self.chunk_overlap,
+                )
 
             result.append(merged)
 
@@ -269,3 +271,35 @@ class MarkdownChunker:
         text = re.sub(r"\n{3,}", "\n\n", text)
         text = re.sub(r" {2,}", " ", text)
         return text.strip()
+
+    def _word_safe_overlap(self, text: str) -> str:
+        """Return overlap text using whole trailing words whenever possible."""
+        if len(text) <= self.chunk_overlap:
+            return text.strip()
+
+        words = text.split()
+        if len(words) <= 1:
+            return text[-self.chunk_overlap :].strip()
+
+        selected: list[str] = []
+        current_len = 0
+
+        for word in reversed(words):
+            selected.append(word)
+            current_len += len(word) + (1 if len(selected) > 1 else 0)
+            if current_len >= self.chunk_overlap:
+                break
+
+        return " ".join(reversed(selected)).strip()
+
+    @staticmethod
+    def _trim_to_boundary(text: str, max_len: int) -> str:
+        """Trim text without cutting the final word when avoidable."""
+        if len(text) <= max_len:
+            return text
+
+        trimmed = text[:max_len].rstrip()
+        boundary = max(trimmed.rfind(" "), trimmed.rfind("\n"))
+        if boundary >= max_len // 2:
+            return trimmed[:boundary].rstrip()
+        return trimmed

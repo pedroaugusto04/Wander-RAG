@@ -43,3 +43,18 @@ class TestMarkdownChunker:
         combined = "\n".join(c.content for c in chunks)
         assert "| Nome | Email |" in combined
         assert "ana@cefetmg.br" in combined
+
+    def test_overlap_does_not_start_mid_word(self) -> None:
+        chunker = MarkdownChunker(chunk_size=70, chunk_overlap=18)
+        markdown = (
+            "# Professores\n\n"
+            "Adilson Mendes Ricardo atende por email institucional. "
+            "Alessio Miranda Junior atende por email institucional. "
+            "Bruno Rodrigues Silva atende por email institucional."
+        )
+
+        chunks = chunker.chunk(markdown)
+
+        assert len(chunks) > 1
+        assert "tal." not in chunks[1].content
+        assert "ucional." not in chunks[1].content.split("\n\n", 1)[-1][:12]

@@ -80,7 +80,7 @@ class RAGPipeline:
         chunk_dicts = [
             {
                 "content": c.content,
-                "source": c.metadata.get("document_title", "Documento institucional"),
+                "source": self._build_chunk_source(c.metadata),
             }
             for c in chunks
         ]
@@ -97,3 +97,12 @@ class RAGPipeline:
             "confidence": confidence,
             "max_score": max_score,
         }
+
+    @staticmethod
+    def _build_chunk_source(metadata: dict[str, Any]) -> str:
+        """Build a short human-readable source label for prompt citations."""
+        title = metadata.get("document_title", "Documento institucional")
+        breadcrumb = str(metadata.get("section_breadcrumb", "")).strip()
+        if breadcrumb:
+            return f"{title} — {breadcrumb}"
+        return str(title)
