@@ -58,3 +58,20 @@ class TestMarkdownChunker:
         assert len(chunks) > 1
         assert "tal." not in chunks[1].content
         assert "ucional." not in chunks[1].content.split("\n\n", 1)[-1][:12]
+
+    def test_markdown_list_chunks_keep_bullet_boundaries(self) -> None:
+        chunker = MarkdownChunker(chunk_size=140, chunk_overlap=24)
+        markdown = (
+            "# Docentes\n\n"
+            "## Lista rápida\n\n"
+            "- Adilson Mendes Ricardo - `adilsonmendes@cefetmg.br`\n"
+            "- Alessio Miranda Junior - `alessio@cefetmg.br`\n"
+            "- Bruno Rodrigues Silva - `brunors@cefetmg.br`\n"
+            "- Douglas Nunes de Oliveira - `douglasnunes@cefetmg.br`\n"
+        )
+
+        chunks = chunker.chunk(markdown)
+
+        assert len(chunks) > 1
+        assert chunks[1].content.startswith("[Docentes > Lista rápida]\n\n- ")
+        assert "alessio@cefetmg.br" in "\n".join(chunk.content for chunk in chunks)

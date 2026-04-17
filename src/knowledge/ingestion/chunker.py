@@ -248,9 +248,19 @@ class MarkdownChunker:
         result: list[str] = [chunks[0].strip()]
 
         for i in range(1, len(chunks)):
-            overlap = self._word_safe_overlap(chunks[i - 1])
+            previous = chunks[i - 1].strip()
+            current = chunks[i].strip()
 
-            merged = f"{overlap} {chunks[i]}".strip()
+            # Word-overlap helps prose retrieval, but it mangles structured
+            # Markdown blocks such as bullet lists by prepending trailing words
+            # from the previous chunk into the next list item.
+            if self._should_skip_overlap(previous, current):
+                result.append(current)
+                continue
+
+            overlap = self._word_safe_overlap(previous)
+
+            merged = f"{overlap} {current}".strip()
             if len(merged) > target_size + self.chunk_overlap:
                 merged = self._trim_to_boundary(
                     merged,
@@ -303,3 +313,24 @@ class MarkdownChunker:
         if boundary >= max_len // 2:
             return trimmed[:boundary].rstrip()
         return trimmed
+
+    @staticmethod
+    def _should_skip_overlap(previous: str, current: str) -> bool:
+        """Return True when overlap would damage structured Markdown."""
+        return (
+            MarkdownChunker._looks_like_markdown_list(previous)
+            or MarkdownChunker._looks_like_markdown_list(current)
+            or MarkdownChunker._looks_like_table(previous)
+            or MarkdownChunker._looks_like_table(current)
+        )
+
+    @staticmethod
+    def _looks_like_markdown_list(text: str) -> bool:
+        """Detect bullet/ordered list chunks that should keep line boundaries."""
+        list_lines = re.findall(r"(?m)^\s*(?:[-*+]|\d+[.)])\s+", text)
+        return len(list_lines) >= 2
+
+    @staticmethod
+    def _looks_like_table(text: str) -> bool:
+        """Detect table chunks that should remain untouched by overlap."""
+        return bool(_TABLE_RE.search(text))
