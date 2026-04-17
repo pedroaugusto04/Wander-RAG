@@ -65,10 +65,55 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+          POSTGRES_HOST: ${{ vars.POSTGRES_HOST }}
+          POSTGRES_PORT: ${{ vars.POSTGRES_PORT }}
           QDRANT_HOST: ${{ vars.QDRANT_HOST || '127.0.0.1' }}
           QDRANT_PORT: ${{ vars.QDRANT_PORT || '6333' }}
+          QDRANT_COLLECTION_NAME: ${{ vars.QDRANT_COLLECTION_NAME }}
+          APP_LOG_LEVEL: ${{ vars.APP_LOG_LEVEL }}
+          APP_HOST: ${{ vars.APP_HOST }}
+          APP_PORT: ${{ vars.APP_PORT }}
+          RAG_CHUNK_SIZE: ${{ vars.RAG_CHUNK_SIZE }}
+          RAG_CHUNK_OVERLAP: ${{ vars.RAG_CHUNK_OVERLAP }}
+          RAG_TOP_K: ${{ vars.RAG_TOP_K }}
+          RAG_SCORE_THRESHOLD: ${{ vars.RAG_SCORE_THRESHOLD }}
+          RAG_CONFIDENCE_NONE_THRESHOLD: ${{ vars.RAG_CONFIDENCE_NONE_THRESHOLD }}
+          RAG_CONFIDENCE_LOW_THRESHOLD: ${{ vars.RAG_CONFIDENCE_LOW_THRESHOLD }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_FALLBACK_MODELS: ${{ vars.LLM_FALLBACK_MODELS }}
+          LLM_TEMPERATURE: ${{ vars.LLM_TEMPERATURE }}
+          LLM_MAX_TOKENS: ${{ vars.LLM_MAX_TOKENS }}
+          EMBEDDING_MODEL: ${{ vars.EMBEDDING_MODEL }}
+          EMBEDDING_FALLBACK_MODELS: ${{ vars.EMBEDDING_FALLBACK_MODELS }}
+          EMBEDDING_DIMENSIONS: ${{ vars.EMBEDDING_DIMENSIONS }}
+          EMBEDDING_REQUESTS_PER_MINUTE: ${{ vars.EMBEDDING_REQUESTS_PER_MINUTE }}
+          EMBEDDING_MAX_RETRIES: ${{ vars.EMBEDDING_MAX_RETRIES }}
+          RAG_EMBEDDING_BATCH_SIZE: ${{ vars.RAG_EMBEDDING_BATCH_SIZE }}
+          LLAMA_CLOUD_API_KEY: ${{ secrets.LLAMA_CLOUD_API_KEY }}
+          LLAMA_PARSE_TIER: ${{ vars.LLAMA_PARSE_TIER }}
+          RERANKER_ENABLED: ${{ vars.RERANKER_ENABLED }}
+          RERANKER_MODEL: ${{ vars.RERANKER_MODEL }}
+          RERANKER_TOP_K: ${{ vars.RERANKER_TOP_K }}
+          RERANKER_RETRIEVAL_MULTIPLIER: ${{ vars.RERANKER_RETRIEVAL_MULTIPLIER }}
         run: |
           bash scripts/deploy/generate-env.sh .deploy/.env.prod
+
+      - name: Validate generated env file
+        run: |
+          set -euo pipefail
+          test -f .deploy/.env.prod
+          grep -q '^TELEGRAM_BOT_TOKEN=' .deploy/.env.prod
+          grep -q '^GEMINI_API_KEY=' .deploy/.env.prod
+          grep -q '^DATABASE_URL=' .deploy/.env.prod
+          grep -q '^QDRANT_HOST=' .deploy/.env.prod
+          grep -q '^QDRANT_PORT=' .deploy/.env.prod
+          grep -q '^QDRANT_COLLECTION_NAME=' .deploy/.env.prod
+          grep -q '^RERANKER_ENABLED=' .deploy/.env.prod
+          grep -q '^RAG_CONFIDENCE_NONE_THRESHOLD=' .deploy/.env.prod
+          grep -q '^RAG_CONFIDENCE_LOW_THRESHOLD=' .deploy/.env.prod
 
       - name: Prepare SSH for VPS sync
         env:
