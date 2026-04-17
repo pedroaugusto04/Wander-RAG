@@ -42,10 +42,10 @@ class Settings(BaseSettings):
     app_port: int = Field(default=8000)
 
     # --- RAG ---
-    rag_chunk_size: int = Field(default=512)
-    rag_chunk_overlap: int = Field(default=64)
-    rag_top_k: int = Field(default=5)
-    rag_score_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
+    rag_chunk_size: int = Field(default=420)
+    rag_chunk_overlap: int = Field(default=24)
+    rag_top_k: int = Field(default=4)
+    rag_score_threshold: float = Field(default=0.35, ge=0.0, le=1.0)
     rag_confidence_none_threshold: float = Field(default=0.35, ge=0.0, le=1.0)
     rag_confidence_low_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
     rag_documents_path: str = Field(default="data/documents")
@@ -64,14 +64,13 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="gemini-2.5-flash")
     llm_fallback_models: str = Field(default="gemini-2.5-flash-lite,gemini-3-flash")
     llm_temperature: float = Field(default=0.3)
-    llm_max_tokens: int = Field(default=1024)
-    embedding_model: str = Field(default="models/gemini-embedding-001")
+    llm_max_tokens: int = Field(default=10000)
+    embedding_model: str = Field(default="models/gemini-embedding-2-preview")
     embedding_fallback_models: str = Field(default="models/gemini-embedding-001")
-    # 0 means auto-detect from the embedding model at startup.
-    embedding_dimensions: int = Field(default=0)
-    embedding_requests_per_minute: int = Field(default=60)
-    embedding_max_retries: int = Field(default=5)
-    rag_embedding_batch_size: int = Field(default=20)
+    embedding_dimensions: int = Field(default=768)
+    embedding_requests_per_minute: int = Field(default=5)
+    embedding_max_retries: int = Field(default=8)
+    rag_embedding_batch_size: int = Field(default=10)
 
     @property
     def is_production(self) -> bool:
