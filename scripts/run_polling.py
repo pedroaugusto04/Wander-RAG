@@ -73,8 +73,14 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
         embedding_base_retry_seconds=settings.embedding_base_retry_seconds,
     )
 
-    detected_embedding_dim = await llm_provider.get_embedding_dimension()
-    vector_size = settings.embedding_dimensions or detected_embedding_dim
+    if settings.embedding_dimensions:
+        vector_size = settings.embedding_dimensions
+        logger.info(
+            "Using configured embedding dimension from EMBEDDING_DIMENSIONS=%d",
+            vector_size,
+        )
+    else:
+        vector_size = await llm_provider.get_embedding_dimension()
 
     # Vector Store
     vector_store = QdrantVectorStore(

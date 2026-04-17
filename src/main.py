@@ -49,15 +49,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedding_base_retry_seconds=settings.embedding_base_retry_seconds,
     )
 
-    detected_embedding_dim = await llm_provider.get_embedding_dimension()
-    vector_size = settings.embedding_dimensions or detected_embedding_dim
-
-    if settings.embedding_dimensions and settings.embedding_dimensions != detected_embedding_dim:
-        logger.warning(
-            "EMBEDDING_DIMENSIONS=%d overrides detected model dim=%d",
-            settings.embedding_dimensions,
-            detected_embedding_dim,
+    if settings.embedding_dimensions:
+        vector_size = settings.embedding_dimensions
+        logger.info(
+            "Using configured embedding dimension from EMBEDDING_DIMENSIONS=%d",
+            vector_size,
         )
+    else:
+        vector_size = await llm_provider.get_embedding_dimension()
 
 
     vector_store = QdrantVectorStore(
