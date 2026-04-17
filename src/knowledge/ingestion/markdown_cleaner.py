@@ -40,7 +40,8 @@ class MarkdownCleaner:
         """Run the full cleaning pipeline and return normalised Markdown."""
         text = markdown
         text = self._fix_encoding(text)
-        text = self._remove_page_artifacts(text)
+        if not source_filename.lower().endswith(".md"):
+            text = self._remove_page_artifacts(text)
         text = self._normalize_headings(text)
         text = self._clean_broken_links(text)
         text = self._normalize_whitespace(text)
@@ -83,9 +84,12 @@ class MarkdownCleaner:
 
         # Remove institutional noise lines, but only if they appear multiple
         # times (a single mention is likely real content, not a header).
+        # We also limit it to short lines to prevent deleting entire paragraphs
+        # that mention CEFET-MG.
         noise_matches = self._INSTITUTIONAL_NOISE.findall(text)
-        if len(noise_matches) > 2:
-            text = self._INSTITUTIONAL_NOISE.sub("", text)
+        for match in set(noise_matches):
+            if len(match) < 150 and text.count(match) > 2:
+                text = text.replace(match, "")
 
         return text
 
