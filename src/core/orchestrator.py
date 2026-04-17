@@ -118,8 +118,8 @@ class AIOrchestrator:
 
             return response_text, response_metadata
 
-        except Exception:
-            logger.exception("Error in AI orchestrator")
+        except Exception as exc:
+            logger.error("Error in AI orchestrator: %s", exc)
             return FALLBACK_ERROR_RESPONSE, None
 
     def _log_interaction(

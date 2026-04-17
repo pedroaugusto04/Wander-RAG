@@ -113,8 +113,8 @@ async def _process_telegram_update(raw_data: dict[str, Any]) -> None:
             reply_to_message_id=incoming.metadata.get("telegram_message_id"),
         )
         await _adapter.send_message(outgoing)
-    except Exception:
-        logger.exception("Error processing Telegram webhook")
+    except Exception as exc:
+        logger.error("Error processing Telegram webhook: %s", exc)
         await _release_update(update_id)
     else:
         await _mark_update_processed(update_id)
@@ -130,8 +130,8 @@ async def telegram_webhook(request: Request) -> Response:
     try:
         raw_data: dict[str, Any] = await request.json()
         asyncio.create_task(_process_telegram_update(raw_data))
-    except Exception:
-        logger.exception("Error processing Telegram webhook")
+    except Exception as exc:
+        logger.error("Error processing Telegram webhook: %s", exc)
 
     # Telegram expects 200 OK regardless of processing outcome
     return Response(status_code=200)

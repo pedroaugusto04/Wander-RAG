@@ -142,12 +142,13 @@ class IngestionPipeline:
                     texts,
                     dimensions=target_dimensions,
                 )
-            except Exception:
-                logger.exception(
-                    "Embedding batch failed for '%s' (chunks %d-%d). Skipping.",
+            except Exception as exc:
+                logger.error(
+                    "Embedding batch failed for '%s' (chunks %d-%d). Skipping. Cause: %s",
                     doc_title,
                     batch_start,
                     batch_start + len(batch) - 1,
+                    exc,
                 )
                 continue
 
@@ -166,8 +167,8 @@ class IngestionPipeline:
                             [chunk.content],
                             dimensions=target_dimensions,
                         )
-                    except Exception:
-                        logger.exception("Failed to embed chunk '%s'", chunk.id)
+                    except Exception as exc:
+                        logger.error("Failed to embed chunk '%s': %s", chunk.id, exc)
                         continue
 
                     if not single:
@@ -225,8 +226,8 @@ class IngestionPipeline:
             if path.is_file() and path.suffix.lower() in allowed:
                 try:
                     count = await self.ingest_file(path)
-                except Exception:
-                    logger.exception("Failed to ingest '%s'", path)
+                except Exception as exc:
+                    logger.error("Failed to ingest '%s': %s", path, exc)
                     continue
                 total += count
 

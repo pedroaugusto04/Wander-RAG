@@ -66,8 +66,8 @@ async def auto_ingest_if_empty(
 
     try:
         ingested = await pipeline.ingest_directory(documents_path, extensions=extensions)
-    except Exception:
-        logger.exception("Auto-ingest failed for '%s'", documents_path)
+    except Exception as exc:
+        logger.error("Auto-ingest failed for '%s': %s", documents_path, exc)
         return 0
 
     logger.info("Auto-ingest complete: %d chunks added", ingested)

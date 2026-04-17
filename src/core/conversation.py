@@ -90,8 +90,8 @@ class ConversationManager:
                         max_turns=self.max_history * 2,
                     )
                     session.history = history
-                except Exception:
-                    logger.exception("Failed to restore conversation history for %s", key)
+                except Exception as exc:
+                    logger.error("Failed to restore conversation history for %s: %s", key, exc)
 
             self._sessions[key] = session
             logger.info("Created new session: %s", key)
@@ -123,8 +123,8 @@ class ConversationManager:
                 content=content,
                 metadata=metadata,
             )
-        except Exception:
-            logger.exception("Failed to persist turn for session %s", session.session_id)
+        except Exception as exc:
+            logger.error("Failed to persist turn for session %s: %s", session.session_id, exc)
 
     async def handle_message(self, message: IncomingMessage) -> str:
         """Handle an incoming message: manage session → delegate to AI → update history."""

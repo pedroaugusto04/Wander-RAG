@@ -112,7 +112,10 @@ class GeminiProvider(LLMProvider):
                 last_exc = exc
                 is_last_model = index >= len(self._generate_models) - 1
                 if not self._should_retry_embedding_error(exc) or is_last_model:
-                    raise
+                    raise RuntimeError(
+                        f"Text generation failed on '{candidate_model}': "
+                        f"{self._format_exception_summary(exc)}"
+                    ) from None
 
                 logger.warning(
                     "Text generation failed on model '%s'. Trying fallback model: %s",
@@ -125,7 +128,10 @@ class GeminiProvider(LLMProvider):
 
         if response is None:
             if last_exc is not None:
-                raise last_exc
+                raise RuntimeError(
+                    f"Text generation failed on all configured models: "
+                    f"{self._format_exception_summary(last_exc)}"
+                ) from None
             raise RuntimeError("No response returned by any configured generation model")
 
         usage: dict[str, int] = {}
@@ -226,7 +232,10 @@ class GeminiProvider(LLMProvider):
                         )
                         break
 
-                    raise
+                    raise RuntimeError(
+                        f"Embedding failed on '{candidate_model}': "
+                        f"{self._format_exception_summary(exc)}"
+                    ) from None
                 else:
                     break
 
@@ -235,7 +244,10 @@ class GeminiProvider(LLMProvider):
 
         if result is None:
             if last_exc is not None:
-                raise last_exc
+                raise RuntimeError(
+                    f"Embedding failed on all configured models: "
+                    f"{self._format_exception_summary(last_exc)}"
+                ) from None
             raise RuntimeError("No embeddings returned by any configured embedding model")
 
         embeddings = [emb.values for emb in result.embeddings]
@@ -293,6 +305,14 @@ class GeminiProvider(LLMProvider):
                 except ValueError:
                     return None
         return None
+
+    @staticmethod
+    def _format_exception_summary(exc: Exception) -> str:
+        """Return a concise error summary without traceback details."""
+        status_code = getattr(exc, "status_code", None)
+        if isinstance(status_code, int):
+            return f"status={status_code} {type(exc).__name__}: {exc}"
+        return f"{type(exc).__name__}: {exc}"
 
     async def get_embedding_dimension(self) -> int:
         """Return embedding dimension for the configured embedding model."""
