@@ -30,7 +30,7 @@ class QdrantVectorStore(VectorStore):
         self,
         host: str = "qdrant",
         port: int = 6333,
-        collection_name: str = "documents2",
+        collection_name: str = "documents",
         vector_size: int = 768,
     ) -> None:
         self.collection_name = collection_name
