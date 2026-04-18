@@ -41,8 +41,8 @@ def _build_app() -> FastAPI:
 
 
 def test_webhook_returns_503_when_not_initialized(monkeypatch: Any) -> None:
-    monkeypatch.setattr(webhook_module, "_adapter", None)
-    monkeypatch.setattr(webhook_module, "_message_handler", None)
+    monkeypatch.setattr(webhook_module._state, "adapter", None)
+    monkeypatch.setattr(webhook_module._state, "message_handler", None)
 
     with TestClient(_build_app()) as client:
         response = client.post("/webhook/telegram", json={"update_id": 1})

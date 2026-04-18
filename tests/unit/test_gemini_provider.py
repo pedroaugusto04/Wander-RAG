@@ -61,7 +61,8 @@ async def test_generate_embeddings_retries_same_model_without_fallback(
         def __init__(self) -> None:
             self.attempt = 0
 
-        async def embed_content(self, *, model: str, contents: list[Any], _config: Any) -> Any:
+        async def embed_content(self, *, model: str, contents: list[Any], config: Any) -> Any:
+            assert config is None
             calls.append(model)
             self.attempt += 1
             if self.attempt < 3:
@@ -71,7 +72,8 @@ async def test_generate_embeddings_retries_same_model_without_fallback(
             )
 
     class FakeClient:
-        def __init__(self, _api_key: str) -> None:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
             self.aio = SimpleNamespace(models=FakeModels())
 
     async def no_sleep(_delay: float) -> None:
@@ -104,14 +106,16 @@ async def test_generate_embeddings_stops_after_max_retries(
     calls: list[str] = []
 
     class FakeModels:
-        async def embed_content(self, *, model: str, contents: list[Any], _config: Any) -> Any:
+        async def embed_content(self, *, model: str, contents: list[Any], config: Any) -> Any:
+            assert config is None
             if not contents:
                 raise AssertionError("Expected at least one content item")
             calls.append(model)
             raise FakeError("quota exceeded", status_code=429)
 
     class FakeClient:
-        def __init__(self, _api_key: str) -> None:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
             self.aio = SimpleNamespace(models=FakeModels())
 
     async def no_sleep(_delay: float) -> None:
