@@ -155,7 +155,8 @@ async def test_low_confidence_prefixes_disclaimer_and_returns_metadata() -> None
         "retrieved_chunks_count": 1,
     }
     assert llm.calls[0]["messages"][0]["role"] == "system"
-    assert "Use somente as informações acima para fatos" in llm.calls[0]["messages"][1]["content"]
+    assert "Priorize as informações acima para fatos confirmados" in llm.calls[0]["messages"][1]["content"]
+    assert "o que veio dos documentos e o que é apenas orientação geral" in llm.calls[0]["messages"][1]["content"]
 
 
 async def test_removes_duplicate_current_user_turn_before_rag_lookup() -> None:

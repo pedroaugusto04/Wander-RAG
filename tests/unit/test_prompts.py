@@ -61,8 +61,9 @@ class TestBuildRagPrompt:
         assert "Wander Jr" in SYSTEM_PROMPT
         assert "CEFET-MG" in SYSTEM_PROMPT
         assert "Nunca invente" in SYSTEM_PROMPT
-        assert "não encontrou essa informação" in SYSTEM_PROMPT
-        assert "sem mencionar \"contexto\"" in CONTEXT_TEMPLATE
+        assert "não encontrou essa informação nos documentos" in SYSTEM_PROMPT
+        assert "o que está confirmado nos documentos" in SYSTEM_PROMPT
+        assert "não encontrou confirmação nos documentos" in CONTEXT_TEMPLATE
         assert "Nunca use termos técnicos como \"contexto\"" in SYSTEM_PROMPT
 
     def test_general_guidance_prompt_mentions_orientation_only(self) -> None:
@@ -73,6 +74,7 @@ class TestBuildRagPrompt:
 
         assert len(messages) == 2
         assert "orientação geral" in messages[0]["content"]
+        assert "não encontrei confirmação específica nos documentos" in messages[1]["content"]
         assert "Não afirme fatos específicos" in messages[1]["content"]
         assert "Preciso de ajuda" in messages[1]["content"]
 
@@ -90,6 +92,7 @@ class TestBuildRagPrompt:
     def test_general_guidance_disclaimer_text_is_explicit(self) -> None:
         assert "orientar de forma geral" in GENERAL_GUIDANCE_DISCLAIMER
         assert "documentos oficiais" in GENERAL_GUIDANCE_DISCLAIMER
+        assert "orientação inicial" in GENERAL_GUIDANCE_DISCLAIMER
 
 
 class TestRagPipelineSourceLabels:
