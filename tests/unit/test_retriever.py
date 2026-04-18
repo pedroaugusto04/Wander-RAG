@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from src.ai.rag.retriever import RAGRetriever
 
 
@@ -18,7 +20,7 @@ class FakeLLMProvider:
         dimensions: int | None = None,
     ) -> list[list[float]]:
         self.calls.append({"texts": texts, "dimensions": dimensions})
-        return [[0.1, 0.2, 0.3]]
+        return [[0.1, 0.2, 0.3] for _ in texts]
 
 
 class FakeVectorStore:
@@ -95,14 +97,16 @@ async def test_retrieve_uses_embedding_dimensions_and_search_threshold() -> None
     assert vector_store.calls == [
         {
             "query_embedding": [0.1, 0.2, 0.3],
-            "top_k": 4,
-            "score_threshold": 0.35,
+            "top_k": 12,
+            "score_threshold": pytest.approx(0.27),
             "filter_metadata": {"document_title": "Guia"},
         }
     ]
     assert len(chunks) == 1
     assert chunks[0].content == "Biblioteca funciona de 8h às 18h."
     assert chunks[0].metadata["document_title"] == "Guia"
+    assert chunks[0].metadata["vector_score"] == 0.82
+    assert chunks[0].metadata["lexical_score"] > 0.0
 
 
 async def test_retrieve_with_reranker_overfetches_and_filters_by_vector_score() -> None:
@@ -192,3 +196,43 @@ async def test_retrieve_list_query_promotes_list_chunks_and_expands_context() ->
         "Docentes > Lista rápida",
         "Docentes > Lista rápida",
     ]
+
+
+async def test_retrieve_penalizes_parse_artifacts_without_strong_lexical_match() -> None:
+    vector_store = FakeVectorStore(
+        [
+            {
+                "content": "Trecho com lista de competências e texto genérico do curso.",
+                "score": 0.9,
+                "metadata": {
+                    "document_title": "PPC",
+                    "section_breadcrumb": "Column 21 > Layout Attribution (Critical)",
+                },
+            },
+            {
+                "content": (
+                    "[Matriz Curricular]\n\n"
+                    "Quadro 13 - Matriz Curricular do curso de Engenharia de Computação."
+                ),
+                "score": 0.74,
+                "metadata": {
+                    "document_title": "Matriz",
+                    "section_breadcrumb": "Quadro 13 - Matriz Curricular",
+                },
+            },
+        ]
+    )
+    llm = FakeLLMProvider()
+    retriever = RAGRetriever(
+        vector_store=vector_store,  # type: ignore[arg-type]
+        llm_provider=llm,  # type: ignore[arg-type]
+        top_k=2,
+        score_threshold=0.35,
+    )
+
+    chunks = await retriever.retrieve("Qual a matriz curricular do curso?")
+
+    assert len(chunks) == 2
+    assert chunks[0].metadata["document_title"] == "Matriz"
+    assert chunks[0].metadata["artifact_penalty"] == 0.0
+    assert chunks[1].metadata["artifact_penalty"] >= 0.12

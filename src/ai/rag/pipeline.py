@@ -81,20 +81,7 @@ class RAGPipeline:
         retrieval_query = await self._rewrite_query(query, conversation_history)
         chunks: list[RetrievedChunk] = await self.retriever.retrieve(retrieval_query)
 
-        # Prefer dense retrieval score for confidence when available.
-        max_score = max(
-            (
-                float(c.metadata.get("vector_score", c.score))
-                for c in chunks
-            ),
-            default=0.0,
-        )
-        if not chunks or max_score < self.confidence_none_threshold:
-            confidence = "none"
-        elif max_score < self.confidence_low_threshold:
-            confidence = "low"
-        else:
-            confidence = "high"
+        confidence, max_score = self._assess_confidence(chunks)
 
         chunk_dicts = [
             {
@@ -111,6 +98,35 @@ class RAGPipeline:
             "max_score": max_score,
             "retrieval_query": retrieval_query,
         }
+
+    def _assess_confidence(self, chunks: list[RetrievedChunk]) -> tuple[str, float]:
+        """Assess confidence with dense score plus lexical/source alignment."""
+        max_score = max(
+            (float(chunk.metadata.get("vector_score", chunk.score)) for chunk in chunks),
+            default=0.0,
+        )
+        if not chunks or max_score < self.confidence_none_threshold:
+            return "none", max_score
+
+        top_chunk = chunks[0]
+        top_vector = float(top_chunk.metadata.get("vector_score", top_chunk.score))
+        top_lexical = float(top_chunk.metadata.get("lexical_score", 0.0))
+        artifact_penalty = float(top_chunk.metadata.get("artifact_penalty", 0.0))
+        source_titles = {
+            str(chunk.metadata.get("document_title", "")).strip()
+            for chunk in chunks[:3]
+            if str(chunk.metadata.get("document_title", "")).strip()
+        }
+
+        if artifact_penalty >= 0.12 and top_lexical < 0.18:
+            return "low", max_score
+        if top_vector >= self.confidence_low_threshold and top_lexical >= 0.2:
+            return "high", max_score
+        if top_vector >= min(0.95, self.confidence_low_threshold + 0.25):
+            return "high", max_score
+        if top_vector >= self.confidence_low_threshold and len(source_titles) == 1 and top_lexical >= 0.12:
+            return "high", max_score
+        return "low", max_score
 
     @staticmethod
     def _build_chunk_source(metadata: dict[str, Any]) -> str:

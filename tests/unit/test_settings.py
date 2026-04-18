@@ -31,3 +31,13 @@ def test_csv_settings_are_normalized_to_lists() -> None:
 
     assert settings.llm_fallback_model_list == ["model-a", "model-b", "model-c"]
     assert settings.rag_supported_extensions_list == [".pdf", ".md", ".txt"]
+
+
+def test_reranker_is_disabled_by_default() -> None:
+    settings = Settings(
+        _env_file=None,
+        telegram_bot_token="telegram-token",
+        gemini_api_key="gemini-key",
+    )
+
+    assert settings.reranker_enabled is False
