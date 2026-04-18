@@ -36,7 +36,12 @@ async def test_ingest_directory_continues_when_a_file_fails(
         llm_provider=FakeLLMProvider(),  # type: ignore[arg-type]
     )
 
-    async def fake_ingest_file(self, file_path: Path, document_title=None, source_type=None) -> int:  # noqa: ANN001, ARG001
+    async def fake_ingest_file(
+        _self: IngestionPipeline,
+        file_path: Path,
+        _document_title: str | None = None,
+        _source_type: str | None = None,
+    ) -> int:
         if file_path.name == "bad.pdf":
             raise RuntimeError("boom")
         return 3

@@ -64,7 +64,11 @@ async def test_auto_ingest_runs_when_collection_is_empty(
 
     calls: list[tuple[Path, list[str] | None]] = []
 
-    async def fake_ingest_directory(self, directory: Path, extensions: list[str] | None = None) -> int:  # noqa: ANN001
+    async def fake_ingest_directory(
+        _self: object,
+        directory: Path,
+        extensions: list[str] | None = None,
+    ) -> int:
         calls.append((directory, extensions))
         return 7
 

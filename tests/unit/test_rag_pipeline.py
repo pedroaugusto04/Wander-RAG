@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NoReturn
 
 from src.ai.rag.pipeline import RAGPipeline
 from src.core.models import RetrievedChunk
@@ -42,7 +42,7 @@ async def test_pipeline_returns_none_confidence_when_no_chunks(monkeypatch: Any)
         llm_provider=FakeLLMProvider(),  # type: ignore[arg-type]
     )
 
-    async def fake_retrieve(query: str) -> list[RetrievedChunk]:  # noqa: ARG001
+    async def fake_retrieve(_query: str) -> list[RetrievedChunk]:
         return []
 
     monkeypatch.setattr(pipeline.retriever, "retrieve", fake_retrieve)
@@ -66,7 +66,7 @@ async def test_pipeline_uses_vector_score_for_low_confidence_and_source_label(
         confidence_low_threshold=0.6,
     )
 
-    async def fake_retrieve(query: str) -> list[RetrievedChunk]:  # noqa: ARG001
+    async def fake_retrieve(_query: str) -> list[RetrievedChunk]:
         return [
             RetrievedChunk(
                 content="O atendimento é das 8h às 17h.",
@@ -99,7 +99,7 @@ async def test_pipeline_returns_high_confidence_with_title_only_source(monkeypat
         confidence_low_threshold=0.6,
     )
 
-    async def fake_retrieve(query: str) -> list[RetrievedChunk]:  # noqa: ARG001
+    async def fake_retrieve(_query: str) -> list[RetrievedChunk]:
         return [
             RetrievedChunk(
                 content="O curso possui 30 docentes.",
@@ -152,7 +152,7 @@ async def test_pipeline_falls_back_to_original_query_when_rewrite_fails(monkeypa
         llm_provider=llm,  # type: ignore[arg-type]
     )
 
-    async def fake_generate(*args: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+    async def fake_generate(*_args: Any, **_kwargs: Any) -> NoReturn:
         raise RuntimeError("rewrite error")
 
     async def fake_retrieve(query: str) -> list[RetrievedChunk]:

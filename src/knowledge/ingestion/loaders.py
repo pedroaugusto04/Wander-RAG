@@ -68,10 +68,11 @@ class DocumentLoader:
             self._llama_parse_tier,
         )
 
-        file_obj = client.files.create(
-            file=open(path, "rb"),  # noqa: SIM115
-            purpose="parse",
-        )
+        with path.open("rb") as file_handle:
+            file_obj = client.files.create(
+                file=file_handle,
+                purpose="parse",
+            )
 
         result = client.parsing.parse(
             file_id=file_obj.id,

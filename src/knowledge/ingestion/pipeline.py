@@ -74,7 +74,7 @@ class IngestionPipeline:
 
         doc_title = document_title or path.stem
         doc_type = source_type or path.suffix.lstrip(".")
-        doc_id = hashlib.md5(str(path.absolute()).encode()).hexdigest()  # noqa: S324
+        doc_id = hashlib.sha256(str(path.absolute()).encode()).hexdigest()
 
         logger.info("Ingesting '%s' (type=%s, id=%s)", doc_title, doc_type, doc_id)
 

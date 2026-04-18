@@ -19,11 +19,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from telegram import Update
-from telegram.ext import Application, MessageHandler, filters
+from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 from src.ai.llm.gemini_provider import GeminiProvider
 from src.ai.rag.pipeline import RAGPipeline
-from src.config.settings import get_settings
+from src.config.settings import Settings, get_settings
 from src.core.conversation import ConversationManager
 from src.core.models import ChannelType, IncomingMessage
 from src.core.orchestrator import AIOrchestrator
@@ -59,7 +59,9 @@ def _acquire_single_instance_lock() -> object:
     return lock_file
 
 
-async def setup_components(settings):  # noqa: ANN001, ANN201
+async def setup_components(
+    settings: Settings,
+) -> tuple[ConversationManager, QdrantVectorStore, GeminiProvider]:
     """Initialize all application components."""
     # LLM Provider
     llm_provider = GeminiProvider(
@@ -147,7 +149,7 @@ async def setup_components(settings):  # noqa: ANN001, ANN201
 
 async def run_manual_ingest(
     *,
-    settings,
+    settings: Settings,
     vector_store: QdrantVectorStore,
     llm_provider: GeminiProvider,
     path: str,
@@ -155,7 +157,7 @@ async def run_manual_ingest(
     chunk_overlap: int | None,
     embedding_batch_size: int | None,
     extensions: list[str] | None,
-) -> int:  # noqa: ANN001
+) -> int:
     """Run manual ingestion when explicitly requested by CLI args."""
     pipeline = IngestionPipeline(
         vector_store=vector_store,
@@ -308,11 +310,17 @@ def main() -> None:
 
         logger.info("📤 Resposta enviada (%d chars)", len(response))
 
-    async def handle_message(update: Update, context) -> None:  # noqa: ANN001, ARG001
+    async def handle_message(
+        update: Update,
+        _context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
         """Handle incoming text messages."""
         await _handle_incoming(update)
 
-    async def handle_command(update: Update, context) -> None:  # noqa: ANN001, ARG001
+    async def handle_command(
+        update: Update,
+        _context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
         """Handle supported bot commands through the shared conversation flow."""
         await _handle_incoming(update, parse_mode="Markdown")
 

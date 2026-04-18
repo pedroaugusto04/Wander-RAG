@@ -18,9 +18,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhook", tags=["telegram"])
 
-# These will be injected at app startup
-_adapter: TelegramChannelAdapter | None = None
-_message_handler: Any = None
+class _WebhookState:
+    def __init__(self) -> None:
+        self.adapter: TelegramChannelAdapter | None = None
+        self.message_handler: Any = None
+
+
+_state = _WebhookState()
 _processed_update_ids: dict[int, float] = {}
 _inflight_update_ids: set[int] = set()
 _update_lock = asyncio.Lock()
@@ -32,9 +36,8 @@ def init_telegram_webhook(
     message_handler: Any,
 ) -> None:
     """Wire the adapter and handler into the webhook router."""
-    global _adapter, _message_handler  # noqa: PLW0603
-    _adapter = adapter
-    _message_handler = message_handler
+    _state.adapter = adapter
+    _state.message_handler = message_handler
 
 
 def _prune_processed_updates(now: float) -> None:
@@ -85,12 +88,12 @@ async def _release_update(update_id: int | None) -> None:
 
 async def _process_telegram_update(raw_data: dict[str, Any]) -> None:
     """Process a Telegram update outside the request lifecycle."""
-    if _adapter is None or _message_handler is None:
+    if _state.adapter is None or _state.message_handler is None:
         logger.error("Telegram webhook called but adapter/handler not initialised")
         return
 
     try:
-        incoming = _adapter.parse_incoming(raw_data)
+        incoming = _state.adapter.parse_incoming(raw_data)
     except ValueError:
         logger.debug("Ignored non-text Telegram update")
         return
@@ -103,16 +106,16 @@ async def _process_telegram_update(raw_data: dict[str, Any]) -> None:
         return
 
     try:
-        await _adapter.send_typing_indicator(incoming.channel_chat_id)
+        await _state.adapter.send_typing_indicator(incoming.channel_chat_id)
 
-        response_text: str = await _message_handler(incoming)
+        response_text: str = await _state.message_handler(incoming)
 
         outgoing = OutgoingMessage(
             text=response_text,
             channel_chat_id=incoming.channel_chat_id,
             reply_to_message_id=incoming.metadata.get("telegram_message_id"),
         )
-        await _adapter.send_message(outgoing)
+        await _state.adapter.send_message(outgoing)
     except Exception as exc:
         logger.error("Error processing Telegram webhook: %s", exc)
         await _release_update(update_id)
@@ -123,7 +126,7 @@ async def _process_telegram_update(raw_data: dict[str, Any]) -> None:
 @router.post("/telegram")
 async def telegram_webhook(request: Request) -> Response:
     """Receive incoming Telegram updates via webhook."""
-    if _adapter is None or _message_handler is None:
+    if _state.adapter is None or _state.message_handler is None:
         logger.error("Telegram webhook called but adapter/handler not initialised")
         return Response(status_code=503)
 
