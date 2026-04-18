@@ -63,14 +63,6 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
   -d "url=https://seu-dominio.com/webhook/telegram"
 ```
 
-## Variáveis no GitHub / Deploy
-
-- Nunca suba o arquivo `.env` no repositório.
-- Suba apenas o `.env.example` com placeholders.
-- No ambiente de deploy (Render, Railway, VPS, etc.), configure as variáveis de ambiente diretamente no painel.
-- Se usar GitHub Actions, configure chaves sensíveis em `Settings > Secrets and variables > Actions`.
-- Para controlar reranker em produção, defina `RERANKER_ENABLED=true|false` nesse ambiente.
-
 ## Estrutura do Projeto
 
 ```
