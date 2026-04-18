@@ -51,7 +51,7 @@ Para fallback automático de chat, ajuste também:
 `LLM_FALLBACK_MODELS`.
 
 Para ligar/desligar reranker no `.env`:
-`RERANKER_ENABLED=false` (padrão recomendado) ou `RERANKER_ENABLED=true` (ligado).
+`RERANKER_ENABLED=false` ou `RERANKER_ENABLED=true` (ligado).
 
 Para perguntas em formato de lista e histórico do prompt, ajuste:
 `RAG_LIST_QUERY_MIN_TOP_K` e `RAG_PROMPT_HISTORY_TURNS`.
