@@ -82,7 +82,7 @@ class MarkdownChunker:
                 continue
 
             # Prefix each chunk with the breadcrumb for retrieval context.
-            prefix = f"[{breadcrumb}]\n\n" if breadcrumb else ""
+            prefix = f"[{breadcrumb}]\n" if breadcrumb else ""
 
             sub_chunks = self._split_section(body, reserved_prefix_len=len(prefix))
 
@@ -136,7 +136,8 @@ class MarkdownChunker:
                 heading_stack.pop()
             heading_stack.append((level, title))
 
-            breadcrumb = " > ".join(t for _, t in heading_stack)
+            # Shortened breadcrumb: only the last 2 levels to save space while keeping context.
+            breadcrumb = " > ".join(t for _, t in heading_stack[-2:])
 
             # Body is everything between this heading and the next one.
             start = match.end()

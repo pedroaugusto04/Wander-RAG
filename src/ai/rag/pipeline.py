@@ -118,14 +118,14 @@ class RAGPipeline:
             if str(chunk.metadata.get("document_title", "")).strip()
         }
 
-        if artifact_penalty >= 0.12 and top_lexical < 0.18:
-            return "low", max_score
-        if top_vector >= self.confidence_low_threshold and top_lexical >= 0.2:
+        if (
+            (top_vector >= self.confidence_low_threshold and top_lexical >= 0.15) or
+            (top_vector >= 0.80) or
+            (top_vector >= min(0.92, self.confidence_low_threshold + 0.20)) or
+            (top_vector >= self.confidence_low_threshold and len(source_titles) == 1 and top_lexical >= 0.10)
+        ):
             return "high", max_score
-        if top_vector >= min(0.95, self.confidence_low_threshold + 0.25):
-            return "high", max_score
-        if top_vector >= self.confidence_low_threshold and len(source_titles) == 1 and top_lexical >= 0.12:
-            return "high", max_score
+
         return "low", max_score
 
     @staticmethod

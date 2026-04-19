@@ -266,8 +266,8 @@ class RAGRetriever:
                 "artifact_penalty": artifact_penalty,
             }
 
-            # Drop obvious parsing artefacts when they only survive by dense score.
-            if artifact_penalty >= 0.14 and lexical_score < 0.18 and vector_score < 0.82:
+            # Drop obvious parsing artefacts only if they are extremely noisy and lack any dense support.
+            if artifact_penalty >= 0.20 and lexical_score < 0.10 and vector_score < 0.75:
                 continue
 
             rescored.append(
@@ -372,7 +372,12 @@ class RAGRetriever:
         overlap = sum(1 for term in query_terms if term in surface)
         title_overlap = sum(1 for term in query_terms if term in title_surface)
         coverage = overlap / len(query_terms)
-        exact_phrase_bonus = 0.08 if normalized_query in surface else 0.0
+        
+        # Boost if nearly all query terms are present.
+        if coverage >= 0.75:
+            coverage += 0.1
+            
+        exact_phrase_bonus = 0.15 if normalized_query in surface else 0.0
         title_bonus = min(0.2, title_overlap * 0.08)
 
         phrase_bonus = 0.0
