@@ -168,7 +168,6 @@ jobs:
             docker-compose.prod.yml "$SERVER_USER@$SERVER_HOST:~/$APP_NAME/docker-compose.prod.yml"
 
       - name: Sync knowledge documents to VPS
-        if: steps.docs_changes.outputs.changed == 'true'
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
@@ -189,13 +188,12 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKER_IMAGE: ${{ env.DOCKER_IMAGE }}
           APP_NAME: ${{ env.APP_NAME }}
-          DOCS_CHANGED: ${{ steps.docs_changes.outputs.changed }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,DOCKER_IMAGE,APP_NAME,DOCS_CHANGED
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,DOCKER_IMAGE,APP_NAME
           script: |
             set -euo pipefail
             mkdir -p ~/${APP_NAME}
@@ -208,11 +206,6 @@ jobs:
             sudo docker pull "$DOCKER_IMAGE"
             
             sudo env DOCKER_IMAGE="$DOCKER_IMAGE" docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --remove-orphans
-
-            if [ "$DOCS_CHANGED" = "true" ]; then
-              sudo docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T app \
-                python scripts/ingest_documents.py data/documents/
-            fi
             
             # Clean up old images
             sudo docker image prune -f
