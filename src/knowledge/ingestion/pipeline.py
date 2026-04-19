@@ -141,6 +141,7 @@ class IngestionPipeline:
                 embeddings = await self.llm_provider.generate_embeddings(
                     texts,
                     dimensions=target_dimensions,
+                    task_type="RETRIEVAL_DOCUMENT",
                 )
             except Exception as exc:
                 logger.error(
@@ -166,6 +167,7 @@ class IngestionPipeline:
                         single = await self.llm_provider.generate_embeddings(
                             [chunk.content],
                             dimensions=target_dimensions,
+                            task_type="RETRIEVAL_DOCUMENT",
                         )
                     except Exception as exc:
                         logger.error("Failed to embed chunk '%s': %s", chunk.id, exc)

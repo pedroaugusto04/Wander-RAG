@@ -55,15 +55,14 @@ def test_build_model_chain_deduplicates_preserving_order() -> None:
 async def test_generate_embeddings_retries_same_model_without_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[str] = []
+    calls: list[dict[str, Any]] = []
 
     class FakeModels:
         def __init__(self) -> None:
             self.attempt = 0
 
         async def embed_content(self, *, model: str, contents: list[Any], config: Any) -> Any:
-            assert config is None
-            calls.append(model)
+            calls.append({"model": model, "config": config})
             self.attempt += 1
             if self.attempt < 3:
                 raise FakeError("quota exceeded", status_code=429)
@@ -93,9 +92,9 @@ async def test_generate_embeddings_retries_same_model_without_fallback(
 
     assert embeddings == [[0.1, 0.2, 0.3]]
     assert calls == [
-        "models/gemini-embedding-2-preview",
-        "models/gemini-embedding-2-preview",
-        "models/gemini-embedding-2-preview",
+        {"model": "models/gemini-embedding-2-preview", "config": None},
+        {"model": "models/gemini-embedding-2-preview", "config": None},
+        {"model": "models/gemini-embedding-2-preview", "config": None},
     ]
 
 
@@ -103,14 +102,13 @@ async def test_generate_embeddings_retries_same_model_without_fallback(
 async def test_generate_embeddings_stops_after_max_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[str] = []
+    calls: list[dict[str, Any]] = []
 
     class FakeModels:
         async def embed_content(self, *, model: str, contents: list[Any], config: Any) -> Any:
-            assert config is None
             if not contents:
                 raise AssertionError("Expected at least one content item")
-            calls.append(model)
+            calls.append({"model": model, "config": config})
             raise FakeError("quota exceeded", status_code=429)
 
     class FakeClient:
@@ -135,7 +133,49 @@ async def test_generate_embeddings_stops_after_max_retries(
         await provider.generate_embeddings(["teste"])
 
     assert calls == [
-        "models/gemini-embedding-2-preview",
-        "models/gemini-embedding-2-preview",
-        "models/gemini-embedding-2-preview",
+        {"model": "models/gemini-embedding-2-preview", "config": None},
+        {"model": "models/gemini-embedding-2-preview", "config": None},
+        {"model": "models/gemini-embedding-2-preview", "config": None},
     ]
+
+
+@pytest.mark.asyncio
+async def test_generate_embeddings_forwards_dimensions_and_task_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen_config: Any = None
+
+    class FakeModels:
+        async def embed_content(self, *, model: str, contents: list[Any], config: Any) -> Any:
+            nonlocal seen_config
+            assert model == "models/gemini-embedding-2-preview"
+            assert len(contents) == 2
+            seen_config = config
+            return SimpleNamespace(
+                embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3]) for _ in contents]
+            )
+
+    class FakeClient:
+        def __init__(self, api_key: str) -> None:
+            self.api_key = api_key
+            self.aio = SimpleNamespace(models=FakeModels())
+
+    monkeypatch.setattr("src.ai.llm.gemini_provider.genai.Client", FakeClient)
+
+    provider = GeminiProvider(
+        api_key="test-key",
+        embedding_model="models/gemini-embedding-2-preview",
+        embedding_requests_per_minute=0,
+    )
+
+    embeddings = await provider.generate_embeddings(
+        ["doc 1", "doc 2"],
+        dimensions=768,
+        task_type="RETRIEVAL_DOCUMENT",
+    )
+
+    assert embeddings == [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]
+    assert seen_config == {
+        "output_dimensionality": 768,
+        "task_type": "RETRIEVAL_DOCUMENT",
+    }

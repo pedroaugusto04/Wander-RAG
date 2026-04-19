@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from google import genai
 from google.genai import types
 
-from src.ai.llm.base import LLMProvider, LLMResponse
+from src.ai.llm.base import EmbeddingTaskType, LLMProvider, LLMResponse
 from src.config.settings import (
     DEFAULT_EMBEDDING_BASE_RETRY_SECONDS,
     DEFAULT_EMBEDDING_MAX_RETRIES,
@@ -159,16 +159,23 @@ class GeminiProvider(LLMProvider):
     async def generate_embeddings(
         self,
         texts: list[str],
+        *,
         dimensions: int | None = None,
+        task_type: EmbeddingTaskType | None = None,
     ) -> list[list[float]]:
         """Generate embeddings using a stable Gemini embedding model."""
         if not texts:
             return []
 
-        config = None
+        config: dict[str, object] | None = None
         if dimensions is not None:
+            config = {}
             # Requests server-side projection when supported by the model.
-            config = {"output_dimensionality": dimensions}
+            config["output_dimensionality"] = dimensions
+        if task_type is not None:
+            if config is None:
+                config = {}
+            config["task_type"] = task_type
 
         # For Gemini Embedding 2 Preview, passing a plain list[str] can be interpreted
         # as a single content. Build an explicit list[Content] to force one embedding

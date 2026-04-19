@@ -4,9 +4,20 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from src.config.settings import DEFAULT_LLM_MAX_TOKENS, DEFAULT_LLM_TEMPERATURE
+
+EmbeddingTaskType = Literal[
+    "RETRIEVAL_QUERY",
+    "RETRIEVAL_DOCUMENT",
+    "SEMANTIC_SIMILARITY",
+    "CLASSIFICATION",
+    "CLUSTERING",
+    "CODE_RETRIEVAL_QUERY",
+    "QUESTION_ANSWERING",
+    "FACT_VERIFICATION",
+]
 
 
 @dataclass
@@ -37,7 +48,9 @@ class LLMProvider(ABC):
     async def generate_embeddings(
         self,
         texts: list[str],
+        *,
         dimensions: int | None = None,
+        task_type: EmbeddingTaskType | None = None,
     ) -> list[list[float]]:
         """Generate embedding vectors for a list of texts."""
         ...

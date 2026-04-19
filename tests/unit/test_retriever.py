@@ -18,8 +18,15 @@ class FakeLLMProvider:
         texts: list[str],
         *,
         dimensions: int | None = None,
+        task_type: str | None = None,
     ) -> list[list[float]]:
-        self.calls.append({"texts": texts, "dimensions": dimensions})
+        self.calls.append(
+            {
+                "texts": texts,
+                "dimensions": dimensions,
+                "task_type": task_type,
+            }
+        )
         return [[0.1, 0.2, 0.3] for _ in texts]
 
 
@@ -93,7 +100,13 @@ async def test_retrieve_uses_embedding_dimensions_and_search_threshold() -> None
         filter_metadata={"document_title": "Guia"},
     )
 
-    assert llm.calls == [{"texts": ["Horário da biblioteca"], "dimensions": 768}]
+    assert llm.calls == [
+        {
+            "texts": ["Horário da biblioteca"],
+            "dimensions": 768,
+            "task_type": "RETRIEVAL_QUERY",
+        }
+    ]
     assert vector_store.calls == [
         {
             "query_embedding": [0.1, 0.2, 0.3],

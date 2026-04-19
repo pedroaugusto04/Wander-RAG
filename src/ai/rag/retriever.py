@@ -117,6 +117,7 @@ class RAGRetriever:
         embeddings = await self.llm_provider.generate_embeddings(
             query_variants,
             dimensions=target_dimensions,
+            task_type="RETRIEVAL_QUERY",
         )
         merged_results: dict[tuple[str, str, str], dict[str, Any]] = {}
 
